@@ -138,6 +138,7 @@ parse:
 action_table:
    DW OFFSET print_action
    DW OFFSET write_action
+   DW OFFSET reset_state
    DW OFFSET finish
 
    ;print CR

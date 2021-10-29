@@ -14,6 +14,8 @@ EXTRN mode:BYTE
 EXTRN bytes_wr:BYTE:BUFFER_MAX
 EXTRN bytes_len:BYTE
 
+byte_wr DB 0
+
 .CODE
 
 ; Shifts REG by 4 positions left
@@ -46,6 +48,21 @@ parse_input PROC NEAR
    xor cx,cx                      ; clear counter
    mov cl,input_size              ; put input buffer size into cl
 
+   cmp cl,1                       ; if input size is not equal to 1 then
+   jne parse_input1               ; proceed with parsing
+
+   mov al,ds:[si]                 ; load first typed char
+   cmp al,QUIT                    ; check if char is Q
+   jne parse_input1               ; if not proceed with parsing
+
+   jmp quit_mode                  ; else quit mode is determined
+
+parse_input1:
+   cmp cl,0                       ; if input size is not equal 0 then try
+   jne determine_mode             ; to determine mode
+
+   jmp error_mode                 ; else error mode is determined
+
 determine_mode:
    lodsb                          ; load first char
 
@@ -77,14 +94,17 @@ determine_mode2:
                                   ; cx by 1 to counter the decrement in
                                   ; read_mode label
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Read mode                       ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 read_mode:
    dec cx                         ; decrement cx in case the mode was
                                   ; determined with DOT
    mov mode,MODE_READ             ; determine the mode to MODE_READ
  
-   jcxz all_parsed
+   jcxz read_end
 
-read_end:
+read_mode1:
    lodsb                          ; read next char into al
 
    call hex_char                  ; check if al is hex char
@@ -100,13 +120,60 @@ read_end:
    mov end_off,bx                 ; store end segment & offset
    mov end_seg,dx
 
-   loop read_end
-   
+   loop read_mode1
+
+read_end:
    jmp all_parsed
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Write mode                      ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 write_mode:
+   dec cx                         ; decrement cx due to detected colon char
+   mov mode,MODE_WRITE            ; determine the mode to MODE_WRITE
 
+   jcxz write_end
 
+write_mode1:
+   lodsb
+
+   cmp al,SPACE
+   jne write_mode2
+
+   xor bx,bx
+   mov bl,bytes_len
+   mov di,bx
+   mov bx,OFFSET bytes_wr
+   mov dl,byte_wr
+   mov byte ptr [bx + di],dl
+
+   mov byte_wr,0
+   inc bytes_len
+  
+write_mode2:
+
+   shl byte_wr,1
+   shl byte_wr,1
+   shl byte_wr,1
+   shl byte_wr,1
+   and al,0fh
+   or byte_wr,al
+
+   loop write_mode1
+
+write_end:
+   jmp all_parsed
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Quit mode                       ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+quit_mode:
+   mov mode,MODE_QUIT
+   retn
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Error mode                      ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 error_mode:
    mov mode,MODE_ERROR
    retn
@@ -146,6 +213,8 @@ hex_char PROC
    cmp al,BKSP
    je hex_char_end
    cmp al,SPACE
+   je hex_char_end
+   cmp al,'Q'
 hex_char_end:
    ret
 ENDP
