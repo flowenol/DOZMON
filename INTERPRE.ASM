@@ -14,7 +14,8 @@ EXTRN mode:BYTE
 EXTRN bytes_wr:BYTE:BUFFER_MAX
 EXTRN bytes_len:BYTE
 
-byte_wr DB 0
+byte_wr     DB 0
+byte_flg    DB 0
 
 .CODE
 
@@ -108,8 +109,10 @@ read_mode1:
    lodsb                          ; read next char into al
 
    call hex_char                  ; check if al is hex char
-   jz error_mode                  ; if no then finish with error
+   jnz read_mode2                 ; if yes then proceed
+   jmp error_mode                 ; if no then finish with error
 
+read_mode2:
    call char_to_hex               ; convert hex char to digit
    mov bx,end_off                 ; load start_off value to bx
    mov dx,end_seg                 ; load start_seg value to dx
@@ -137,9 +140,19 @@ write_mode:
 write_mode1:
    lodsb
 
+   call hex_char
+   jnz write_mode4   
+
    cmp al,SPACE
    jne write_mode2
+   cmp byte_flg,0
+   je write_mode5
+   jmp write_mode3
 
+write_mode2:
+   jmp error_mode
+
+write_mode3:
    xor bx,bx
    mov bl,bytes_len
    mov di,bx
@@ -148,17 +161,19 @@ write_mode1:
    mov byte ptr [bx + di],dl
 
    mov byte_wr,0
+   mov byte_flg,0
    inc bytes_len
   
-write_mode2:
-
+write_mode4:
    shl byte_wr,1
    shl byte_wr,1
    shl byte_wr,1
    shl byte_wr,1
    and al,0fh
    or byte_wr,al
+   or byte_flg,1
 
+write_mode5:
    loop write_mode1
 
 write_end:
@@ -214,7 +229,7 @@ hex_char PROC
    je hex_char_end
    cmp al,SPACE
    je hex_char_end
-   cmp al,'Q'
+   cmp al,QUIT
 hex_char_end:
    ret
 ENDP
