@@ -1,6 +1,5 @@
 TASM = tasm
-#TASM_OPT = /m2 /l
-TASM_OPT = /m2
+TASM_OPT = /m2 /l
 TLINK = tlink
 TLINK_OPT = /v
 

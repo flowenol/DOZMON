@@ -18,7 +18,12 @@ bytes_len          DB 0
 
 END_OF_STATE       EQU $ - input_size
 
-help_string        DB CR,LF,"DOZMON ver 0.1",CR,LF,'$'
+help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
+                   DB CR,LF
+                   DB "Options:",CR,LF
+                   DB "/n - no clear screen",CR,LF
+                   DB "/h - display help",CR,LF
+                   DB CR,LF,'$'
 
 EXTRN option:options
 EXTRN psp:WORD
@@ -141,11 +146,6 @@ action_table:
    DW OFFSET reset_state
    DW OFFSET finish
 
-   ;print CR
-   ;print LF
-   ;mov al,input_size
-   ;call NEAR PTR print_number
-
 print_action:
    mov ax,end_seg                 ; check if end_seg is 0, this indicates
    cmp ax,0                       ; possibility of single address read
@@ -160,6 +160,10 @@ print_action:
    mov ax,start_off
    mov end_off,ax
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Print action                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 print_compare:
    mov ax,start_seg               ; compare start_seg to end seg
    cmp ax,end_seg
@@ -201,34 +205,59 @@ print_byte:
    je print_end                   ; if yes stop printing
 
 print_next_byte:
-   mov ax,es
-   add di,1                       ; increment current offset by 1
-   adc ax,0                       ; adjust segment if offset overflow detected
+   inc di                         ; increment current offset by 1
+   jnz print_loop_tail
+
+   mov ax,es                      ; adjust segment if offset overflow detected
+   add ax,1000h
    mov es,ax
 
-   loop print_byte                ; print tbe next byte
+print_loop_tail:
+   loop print_byte                ; print next byte
    jmp print_offset               ; if last byte print the current address
 
 print_end:
    pop es                         ; restore original es segment value
    jmp reset_state                ; reset state of the program
 
-write_action:
-   print CR
-   print LF
-   xor ch,ch
-   mov cl,bytes_len
-write_loop:
-   mov bx,OFFSET bytes_wr
-   xor ah,ah
-   mov al,bytes_len
-   mov di,ax
-   sub di,cx
-   mov al,byte ptr [bx + di]
-   call print_hex
-   print space
-   loop write_loop
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Write action                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+write_action:
+   xor ch,ch
+   mov cl,bytes_len               ; set cx to number of bytes to write
+
+   jcxz reset_state               ; finish early if no bytes to write
+
+   push es                        ; save original es segment value
+   les di,[dword ptr start_off]   ; load start_off value into es:di 
+   
+   mov bx,OFFSET bytes_wr         ; set bx to bytes array offset
+   xor si,si                      ; set array index to 0
+
+write_loop:
+   mov al,byte ptr [bx + si]      ; read byte from write array to al
+   mov es:[di],al                 ; save at destination address
+   
+   inc si                         ; increment array index
+   inc di                         ; increment destination offset
+   jnz write_loop_tail            ; proceed to next byte if no 
+                                  ; destination offset overflow
+
+   mov ax,es                      ; adjust segment if offset overflow detected
+   add ax,1000h
+   mov es,ax
+
+write_loop_tail:   
+   loop write_loop
+   
+   pop es                         ; restore previous es segment value
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Reset state                     ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 reset_state:
    mov cx,END_OF_STATE            ; set cx to number of state variables bytes
    mov di,OFFSET input_size       ; set di to the offset of the 1st variable
