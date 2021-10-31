@@ -14,8 +14,8 @@ EXTRN mode:BYTE
 EXTRN bytes_wr:BYTE:BUFFER_MAX
 EXTRN bytes_len:BYTE
 
-byte_wr     DB 0
-byte_flg    DB 0
+byte_wr     DB 0                  ; current parsed byte in write mode
+byte_flg    DB 0                  ; byte boudary flag in write mode
 
 .CODE
 
@@ -123,7 +123,7 @@ read_mode2:
    mov end_off,bx                 ; store end segment & offset
    mov end_seg,dx
 
-   loop read_mode1
+   loop read_mode1                ; loop until input buffer is exhausted
 
 read_end:
    jmp all_parsed
@@ -134,47 +134,63 @@ read_end:
 write_mode:
    dec cx                         ; decrement cx due to detected colon char
    mov mode,MODE_WRITE            ; determine the mode to MODE_WRITE
+   mov byte_wr,0                  ; clear actual byte variable
+   mov byte_flg,0                 ; clear byte boundary detection flag
 
-   jcxz write_end
+   jcxz write_end                 ; if there is no input to process then finish
 
 write_mode1:
-   lodsb
+   lodsb                          ; load char from input
 
-   call hex_char
-   jnz write_mode4   
+   call hex_char                  ; check if char is hex
+   jnz write_mode4                ; if yes then parse byte 
 
-   cmp al,SPACE
-   jne write_mode2
-   cmp byte_flg,0
-   je write_mode5
-   jmp write_mode3
+   cmp al,SPACE                   ; check if char is SPACE
+   jne write_mode2                ; if not then determine error mode
+   cmp byte_flg,0                 ; check if this SPACE is a byte boundary
+   je write_mode5                 ; if not then proceed to next char
+   jmp write_mode3                ; if yes then finish and save the byte
 
 write_mode2:
    jmp error_mode
 
-write_mode3:
+write_mode3:                      
    xor bx,bx
+   mov bl,bytes_len 
+   mov di,bx                      ; load current parsed byte count into di
+   mov bx,OFFSET bytes_wr         ; load bx with offset of parsed bytes array
+   mov dl,byte_wr
+   mov byte ptr [bx + di],dl      ; save parsed byte into bytes array
+
+   mov byte_wr,0                  ; clear parsed byte
+   mov byte_flg,0                 ; clear byte boundary helper flag
+   inc bytes_len                  ; increment bytes count
+
+   jmp write_mode5                ; jump to loop tail
+  
+write_mode4:
+   shl byte_wr,1                  ; shift currently parsed byte left x4 times
+   shl byte_wr,1
+   shl byte_wr,1
+   shl byte_wr,1
+   call char_to_hex               ; convert char to hex value
+   or byte_wr,al                  ; add lower 4 bits to curently parsed byte
+   mov byte_flg,1                 ; set byte boundary helper flag
+
+write_mode5:
+   loop write_mode1               ; loop until input buffer is exhausted
+
+   cmp byte_flg,1                 ; check if unfinished byte is pending
+   jne write_end                  ; if not then finish
+
+   xor bx,bx                      ; else save the byte in write buffer
    mov bl,bytes_len
    mov di,bx
    mov bx,OFFSET bytes_wr
    mov dl,byte_wr
    mov byte ptr [bx + di],dl
 
-   mov byte_wr,0
-   mov byte_flg,0
-   inc bytes_len
-  
-write_mode4:
-   shl byte_wr,1
-   shl byte_wr,1
-   shl byte_wr,1
-   shl byte_wr,1
-   and al,0fh
-   or byte_wr,al
-   or byte_flg,1
-
-write_mode5:
-   loop write_mode1
+   inc bytes_len                  ; and increment bytes count
 
 write_end:
    jmp all_parsed
@@ -206,7 +222,7 @@ ENDP
 ; destroys al
 char_to_hex PROC
    cmp al,60h                     ; check if char in al is alphanumeric
-   jl digit                       ; if not jump to corresponding lael
+   jl digit                       ; if not jump to digit handling
    sub al,60h                     ; subtract char before 'a'
    add al,09h                     ; add 9 to adjust value
    jmp converted

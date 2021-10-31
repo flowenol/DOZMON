@@ -214,7 +214,20 @@ print_end:
    jmp reset_state                ; reset state of the program
 
 write_action:
-   print 'W'
+   print CR
+   print LF
+   xor ch,ch
+   mov cl,bytes_len
+write_loop:
+   mov bx,OFFSET bytes_wr
+   xor ah,ah
+   mov al,bytes_len
+   mov di,ax
+   sub di,cx
+   mov al,byte ptr [bx + di]
+   call print_hex
+   print space
+   loop write_loop
 
 reset_state:
    mov cx,END_OF_STATE            ; set cx to number of state variables bytes

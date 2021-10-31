@@ -1,4 +1,5 @@
 TASM = tasm
+#TASM_OPT = /m2 /l
 TASM_OPT = /m2
 TLINK = tlink
 TLINK_OPT = /v
@@ -9,10 +10,11 @@ compile:
         $(TASM) $(TASM_OPT) dozmon.asm + tools.asm + args.asm + interpre.asm
 
 link:
-        $(TLINK) $(TLINK_OPT) dozmon.obj + tools.obj + args.obj + interpre.obj
+        $(TLINK) $(TLINK_OPT) dozmon.obj + tools.obj + args.obj + interpre.obj,dozmon.exe,dozmon.map
 
 clean:
         del *.exe 
         del *.obj
+        del *.lst
         del *.map
 

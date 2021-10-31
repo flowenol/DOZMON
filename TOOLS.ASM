@@ -157,7 +157,7 @@ print_hex PROC NEAR
    shr al,cl
    call print_nibble
    mov bx,sp
-   mov ax,[bx]
+   mov ax,ss:[bx]
    call print_nibble
    pop ax
    pop cx
