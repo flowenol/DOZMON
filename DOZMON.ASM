@@ -22,6 +22,7 @@ help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
                    DB CR,LF
                    DB "Options:",CR,LF
                    DB "/n - no clear screen",CR,LF
+                   DB "/p - enable paging",CR,LF
                    DB "/h - display help",CR,LF
                    DB CR,LF,'$'
 
@@ -45,12 +46,14 @@ INCLUDE macros.inc
 
 EXTRN parse_args:NEAR             ; declared in 'args' module
 
+EXTRN wait_for_char:NEAR          ; declared in 'tools' module
+EXTRN read_cursor:NEAR            ; declared in 'tools' module
 EXTRN read_char:NEAR              ; declared in 'tools' module
-EXTRN print_number:NEAR
-EXTRN print_hex:NEAR
-EXTRN cls:NEAR
-EXTRN print_address:NEAR
-EXTRN print_at_col:NEAR
+EXTRN print_number:NEAR           ; declared in 'tools' module
+EXTRN print_hex:NEAR              ; declared in 'tools' module
+EXTRN cls:NEAR                    ; declared in 'tools' module
+EXTRN print_address:NEAR          ; declared in 'tools' module
+EXTRN print_at_col:NEAR           ; declared in 'tools' module
 
 EXTRN parse_input:NEAR            ; declared in 'interpret' module
 
@@ -167,9 +170,12 @@ print_action:
 print_compare:
    mov ax,start_seg               ; compare start_seg to end seg
    cmp ax,end_seg
-   ja print_end                   ; if greater then try again
+   je print_compare1              ; if equal then compare offsets
    jb print_bytes                 ; if lesser then start printing
 
+   jmp print_end                  ; if greater then try again
+
+print_compare1:
    mov ax,start_off               ; if equal then we must compare offsets
    cmp ax,end_off                 ; if start_off greater then try again
    ja print_end
@@ -177,8 +183,28 @@ print_compare:
 print_bytes:
    push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
+   
+   call NEAR PTR read_cursor      ; read cursor position
+   sub dh,25                      ; calculate rows to bottom of the screen
+   neg dh
+
+   cmp dh,1                       ; check if already at the bottom row
+   jne print_offset               ; if no then proceed
+   mov dh,25                      ; else set row counter to 25 (max)
 
 print_offset:
+   dec dh                         ; decrement row counter
+   jnz print_offset1              ; if not last row then proceed 
+
+   mov al,option                  ; else check if paging option was set
+   and al,MASK paging
+   jz print_offset1
+
+   mov al,CR                      ; wait for user to press CR
+   call NEAR PTR wait_for_char
+   mov dh,25                      ; and reset the row counter to max
+
+print_offset1:
    print CR                       ; go to new line
    print LF
    call NEAR PTR print_address    ; print current address followed by a colon
@@ -195,7 +221,9 @@ print_byte:
    mov ah,4eh                     ; set column for byte ASCII representation
    sub ah,cl
 
+   push dx                        ; preserve row counter
    call NEAR PTR print_at_col     ; print byte ASCII representation
+   pop dx                         ; restore row counter
 
    mov ax,es                      
    cmp ax,end_seg                 ; check if current segment equals end_seg

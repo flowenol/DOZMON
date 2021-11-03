@@ -14,12 +14,47 @@ ALLOWED_CHARS_LENGTH EQU ($ - allowed_chars)
 
 INCLUDE macros.inc
 
+PUBLIC wait_for_char
+PUBLIC read_cursor
 PUBLIC read_char
 PUBLIC print_number
 PUBLIC cls
 PUBLIC print_address
 PUBLIC print_hex
 PUBLIC print_at_col
+
+; Loops until char declared in al is
+; read from keyboard
+;
+; destroys ah,bx
+wait_for_char PROC NEAR
+   push ax
+
+wait_for:
+   mov ah,08h                     ; read char into al
+   int 21h
+
+   mov bx,sp
+   cmp al,ss:[bx]
+   jne wait_for
+
+   pop ax
+   retn
+ENDP
+
+; Reads cursor position in dh:dl
+; 
+; destroys ah,bh
+read_cursor PROC NEAR
+  push cx
+  
+  mov bh,00h                      ; set page 0
+  mov ah,03h                      ; read current cursor position into dh:dl
+  int 10h
+
+  pop cx
+  retn
+ENDP
 
 ; Reads only allowed chars
 ; destroys ax,es,di,dl,cx
@@ -174,11 +209,11 @@ print_at_col PROC NEAR
   push bp                         ; save current stack frame
   mov bp,sp                       ; set new stack frame
   sub sp,1                        ; reserve 1 byte on stack for current column
-  
-  mov bh,00h                      ; set page 0
+
+  mov bh,00h                      ; set page 0  
 
   push ax                         ; save column parameter in ah
-  mov ah,03h                      ; read current cursor position into dh:dl
+  mov ah,03h                      ; read current cursor position into dh:dl 
   int 10h
 
   mov [bp - 1],dl                 ; save original cursor column

@@ -5,9 +5,10 @@ INCLUDE const.inc
 
 PSP_ARGS_OFFSET EQU 80h
 
-OPTION_START EQU '/'
-OPTION_NOCLS EQU 'n'
-OPTION_HELP  EQU 'h'
+OPTION_START   EQU '/'
+OPTION_NOCLS   EQU 'n'
+OPTION_HELP    EQU 'h'
+OPTION_PAGING  EQU 'p'
 
 option options <0,0>
 psp DW ?
@@ -16,6 +17,12 @@ PUBLIC option
 PUBLIC psp
 
 .CODE
+
+set_option MACRO opt
+   mov ah,option       
+   or ah,MASK opt
+   mov option,ah
+ENDM
 
 PUBLIC parse_args
 
@@ -61,17 +68,19 @@ parse:
    cmp al,OPTION_HELP             ; check if indicates help option
    jne nocls
 
-   mov ah,option                  ; store help option flag
-   or ah,MASK help
-   mov option,ah
+   set_option help
 
 nocls:
    cmp al,OPTION_NOCLS            ; check if indicates no clear screen option
-   jne parse_arg_end 
+   jne pagng
 
-   mov ah,option                  ; store no clear screen option flag
-   or ah,MASK no_clear
-   mov option,ah
+   set_option no_clear
+
+pagng:
+   cmp al,OPTION_PAGING           ; check if indicates paging option
+   jne parse_arg_end
+
+   set_option paging
 
 parse_arg_end:
    dec cl                         ; adjust cl for read character
