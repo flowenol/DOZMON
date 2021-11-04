@@ -15,7 +15,6 @@ ALLOWED_CHARS_LENGTH EQU ($ - allowed_chars)
 INCLUDE macros.inc
 
 PUBLIC wait_for_char
-PUBLIC read_cursor
 PUBLIC read_char
 PUBLIC print_number
 PUBLIC cls
@@ -40,20 +39,6 @@ wait_for:
 
    pop ax
    retn
-ENDP
-
-; Reads cursor position in dh:dl
-; 
-; destroys ah,bh
-read_cursor PROC NEAR
-  push cx
-  
-  mov bh,00h                      ; set page 0
-  mov ah,03h                      ; read current cursor position into dh:dl
-  int 10h
-
-  pop cx
-  retn
 ENDP
 
 ; Reads only allowed chars
@@ -186,16 +171,16 @@ ENDP
 ;
 ; destroys bx
 print_hex PROC NEAR
-   push cx
-   push ax
-   mov cl,4
-   shr al,cl
-   call print_nibble
+   push cx                        ; preserve cx
+   push ax                        ; preserve ax
+   mov cl,4                       
+   shr al,cl                      ; shr 4 times to get high nibble
+   call print_nibble              ; print high nibble
    mov bx,sp
-   mov ax,ss:[bx]
-   call print_nibble
-   pop ax
-   pop cx
+   mov ax,ss:[bx]                 ; restore ax without popping from stack
+   call print_nibble              ; print low nibble
+   pop ax                         ; restore ax
+   pop cx                         ; restore cx
    retn
 ENDP
 

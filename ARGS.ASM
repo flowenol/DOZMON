@@ -5,10 +5,10 @@ INCLUDE const.inc
 
 PSP_ARGS_OFFSET EQU 80h
 
-OPTION_START   EQU '/'
-OPTION_NOCLS   EQU 'n'
-OPTION_HELP    EQU 'h'
+OPTION_PREFIX  EQU '/'
+OPTION_CLS     EQU 'c'
 OPTION_PAGING  EQU 'p'
+OPTION_HELP    EQU 'h'
 
 option options <0,0>
 psp DW ?
@@ -42,7 +42,7 @@ parse_loop:
    inc bx                         ; proceed with next char
    
    mov al,es:[bx]                 ; load char
-   cmp al,OPTION_START            ; check if char indicates option start
+   cmp al,OPTION_PREFIX           ; check if char indicates option start
    jne next                       ; if not proceed with next char
 
    call parse_arg                 ; if yes try to parse
@@ -66,15 +66,15 @@ parse:
    mov al,es:[bx]               
 
    cmp al,OPTION_HELP             ; check if indicates help option
-   jne nocls
+   jne cls
 
    set_option help
 
-nocls:
-   cmp al,OPTION_NOCLS            ; check if indicates no clear screen option
+cls:
+   cmp al,OPTION_CLS              ; check if indicates clear screen option
    jne pagng
 
-   set_option no_clear
+   set_option clear
 
 pagng:
    cmp al,OPTION_PAGING           ; check if indicates paging option

@@ -16,12 +16,12 @@ mode               DB 0
 bytes_wr           DB BUFFER_MAX DUP(0)
 bytes_len          DB 0
 
-END_OF_STATE       EQU $ - input_size
+END_OF_STATE       EQU ($ - input)
 
 help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
                    DB CR,LF
                    DB "Options:",CR,LF
-                   DB "/n - no clear screen",CR,LF
+                   DB "/c - enable clear screen",CR,LF
                    DB "/p - enable paging",CR,LF
                    DB "/h - display help",CR,LF
                    DB CR,LF,'$'
@@ -47,7 +47,6 @@ INCLUDE macros.inc
 EXTRN parse_args:NEAR             ; declared in 'args' module
 
 EXTRN wait_for_char:NEAR          ; declared in 'tools' module
-EXTRN read_cursor:NEAR            ; declared in 'tools' module
 EXTRN read_char:NEAR              ; declared in 'tools' module
 EXTRN print_number:NEAR           ; declared in 'tools' module
 EXTRN print_hex:NEAR              ; declared in 'tools' module
@@ -67,17 +66,17 @@ start:
 
    mov al,option                  ; check if help option was selected
    and al,MASK help
-   jz start1
+   jz start1                      ; proceed if no
 
-   mov bx,OFFSET help_string
+   mov bx,OFFSET help_string      ; if yes then print help
    print_string @data,bx
 
    jmp finish                     ; end program if help option was selected
 
 start1:
-   mov al,option                  ; check if no clear_screen option was selected
-   and al,MASK no_clear
-   jnz start2
+   mov al,option                  ; check if clear screen option was selected
+   and al,MASK clear
+   jz start2
 
    call NEAR PTR cls              ; clear screen
 
@@ -149,7 +148,13 @@ action_table:
    DW OFFSET reset_state
    DW OFFSET finish
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Print action                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 print_action:
+   push es                        ; save original es segment value
+
    mov ax,end_seg                 ; check if end_seg is 0, this indicates
    cmp ax,0                       ; possibility of single address read
    jne print_compare
@@ -163,10 +168,6 @@ print_action:
    mov ax,start_off
    mov end_off,ax
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Print action                    ;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 print_compare:
    mov ax,start_seg               ; compare start_seg to end seg
    cmp ax,end_seg
@@ -181,32 +182,34 @@ print_compare1:
    ja print_end
 
 print_bytes:
-   push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
-   
-   call NEAR PTR read_cursor      ; read cursor position
-   sub dh,25                      ; calculate rows to bottom of the screen
-   neg dh
-
-   cmp dh,1                       ; check if already at the bottom row
-   jne print_offset               ; if no then proceed
-   mov dh,25                      ; else set row counter to 25 (max)
+   mov dh,MAX_ROWS + 1            ; set row counter to 26 (max+1)
 
 print_offset:
    dec dh                         ; decrement row counter
    jnz print_offset1              ; if not last row then proceed 
 
-   mov al,option                  ; else check if paging option was set
+   mov al,option                  ; check if paging option was set
    and al,MASK paging
    jz print_offset1
 
-   mov al,CR                      ; wait for user to press CR
+   mov al,CR                      ; if yes wait for user to press CR
    call NEAR PTR wait_for_char
-   mov dh,25                      ; and reset the row counter to max
+   mov dh,MAX_ROWS                ; and reset the row counter to max
+
+   mov al,option                  ; check if clear screen option was set
+   and al,MASK clear
+   jz print_offset1
+
+   call NEAR PTR cls              ; if yes clear the screen
+   mov dh,MAX_ROWS                ; and reset the row counter to max
+
+   jmp print_offset2              ; skip linefeed after screen was cleared
 
 print_offset1:
    print CR                       ; go to new line
    print LF
+print_offset2:
    call NEAR PTR print_address    ; print current address followed by a colon
    print COLON
 
@@ -288,7 +291,7 @@ write_loop_tail:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 reset_state:
    mov cx,END_OF_STATE            ; set cx to number of state variables bytes
-   mov di,OFFSET input_size       ; set di to the offset of the 1st variable
+   mov di,OFFSET input            ; set di to the offset of the 1st variable
    mov al,0                       ; set al to to clear consecutive bytes
 reset_state1:
    stosb                          ; clear state variable byte
