@@ -145,6 +145,7 @@ parse:
 action_table:
    DW OFFSET print_action
    DW OFFSET write_action
+   DW OFFSET file_action
    DW OFFSET reset_state
    DW OFFSET finish
 
@@ -284,7 +285,14 @@ write_loop_tail:
    loop write_loop
    
    pop es                         ; restore previous es segment value
+   jmp reset_state
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; File action                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+file_action:
+   print 'F'
+   jmp reset_state
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Reset state                     ;

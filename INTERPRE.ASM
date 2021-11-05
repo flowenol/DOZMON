@@ -14,6 +14,7 @@ EXTRN mode:BYTE
 EXTRN bytes_wr:BYTE:BUFFER_MAX
 EXTRN bytes_len:BYTE
 
+file_flg    DB 0                  ; indicates that operation involves file
 byte_wr     DB 0                  ; current parsed byte in write mode
 byte_flg    DB 0                  ; byte boudary flag in write mode
 
@@ -65,21 +66,33 @@ parse_input1:
    jmp error_mode                 ; else error mode is determined
 
 determine_mode:
-   lodsb                          ; load first char
+   lodsb                          ; load char
 
+   cmp cl,input_size              ; check if processing first char in buffer
+   jne determine_mode1            ; if not proceed
+
+   cmp al,CHEVRON                 ; else check if operation involves file
+   jne determine_mode1            ; if not proceed
+   
+   mov file_flg,1                 ; else set file flaf
+   loop determine_mode            ; and get next byte
+
+   jmp error_mode                 ; if no byte then error mode is determined
+   
+determine_mode1:
    cmp al,DOT                     ; if the char is dot then read mode is
    je read_mode                   ; determined
 
    cmp al,COLON                   ; if the char is colon then write mode is
-   jne determine_mode1            ; determined
+   jne determine_mode2            ; determined
    jmp write_mode
 
-determine_mode1:
+determine_mode2:
    call hex_char                  ; if the char is not hex char at this moment
-   jnz determine_mode2            ; then error mode is determined
+   jnz determine_mode3            ; then error mode is determined
    jmp error_mode
 
-determine_mode2:
+determine_mode3:
    call char_to_hex               ; convert hex char to digit
    mov bx,start_off               ; load start_off value to bx
    mov dx,start_seg               ; load start_seg value to dx
@@ -101,8 +114,6 @@ determine_mode2:
 read_mode:
    dec cx                         ; decrement cx in case the mode was
                                   ; determined with DOT
-   mov mode,MODE_READ             ; determine the mode to MODE_READ
- 
    jcxz read_end
 
 read_mode1:
@@ -126,7 +137,15 @@ read_mode2:
    loop read_mode1                ; loop until input buffer is exhausted
 
 read_end:
-   jmp all_parsed
+   cmp file_flg,1                 ; check if file operation flag was set
+   jne read_end1                  ; if not proceed
+   mov mode,MODE_FILE             ; else determine file mode
+   jmp all_parsed                 ; and finish
+
+read_end1:
+   mov mode,MODE_READ             ; determine plain read mode
+   jmp all_parsed                 ; and finish
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Write mode                      ;
@@ -206,10 +225,14 @@ quit_mode:
 ; Error mode                      ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 error_mode:
-   mov mode,MODE_ERROR
+   mov mode,MODE_ERROR            ; determine error mode
    retn
 
 all_parsed:
+   mov file_flg,0                 ; clear helper variables
+   mov byte_wr,0
+   mov byte_flg,0
+
    mov cl,12                      ; adjust segment variables by shifting
    shl start_seg,cl               ; 12 positions left
    shl end_seg,cl
@@ -240,6 +263,8 @@ hex_char PROC
    cmp al,DOT
    je hex_char_end
    cmp al,COLON
+   je hex_char_end
+   cmp al,CHEVRON
    je hex_char_end
    cmp al,BKSP
    je hex_char_end
