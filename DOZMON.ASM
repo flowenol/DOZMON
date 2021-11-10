@@ -146,7 +146,7 @@ action_table:
    DW OFFSET print_action
    DW OFFSET write_action
    DW OFFSET file_action
-   DW OFFSET reset_state
+   DW OFFSET error_action
    DW OFFSET finish
 
 
@@ -156,31 +156,11 @@ action_table:
 print_action:
    push es                        ; save original es segment value
 
-   mov ax,end_seg                 ; check if end_seg is 0, this indicates
-   cmp ax,0                       ; possibility of single address read
-   jne print_compare
+   call compare_offsets           ; validate offsets
+   jnc print_bytes
+   print BELL   
 
-   mov ax,end_off                 ; check if end_off is 0, this determines
-   cmp ax,0                       ; single address read
-   jne print_compare
-
-   mov ax,start_seg               ; single address will be read, copy start
-   mov end_seg,ax                 ; to end offsets and segments.
-   mov ax,start_off
-   mov end_off,ax
-
-print_compare:
-   mov ax,start_seg               ; compare start_seg to end seg
-   cmp ax,end_seg
-   je print_compare1              ; if equal then compare offsets
-   jb print_bytes                 ; if lesser then start printing
-
-   jmp print_end                  ; if greater then try again
-
-print_compare1:
-   mov ax,start_off               ; if equal then we must compare offsets
-   cmp ax,end_off                 ; if start_off greater then try again
-   ja print_end
+   jmp print_end
 
 print_bytes:
    les di,[dword ptr start_off]   ; load start_off value into es:di 
@@ -288,11 +268,30 @@ write_loop_tail:
    jmp reset_state
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; File action                    ;
+; File action                     ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 file_action:
-   print 'F'
+   push es                        ; save original es segment value
+
+   call compare_offsets           ; validate offsets
+   jnc file_bytes
+   print BELL   
+
+   jmp file_end
+
+file_bytes:
+
+
+file_end:
+   pop es
    jmp reset_state
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Error action                    ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+error_action:
+   print BELL
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Reset state                     ;
@@ -312,5 +311,48 @@ reset_state1:
 
 finish:
    exit                           ; exit to DOS
+
+
+; Validates start versus end segments & offsets.
+; Adjusts end segment & offsets for single byte read.
+; C=1 if end segment/offset is below start segmen/offset
+;
+; destroys ax
+compare_offsets PROC
+   mov ax,end_seg                 ; check if end_seg is 0, this indicates
+   cmp ax,0                       ; possibility of single address read
+   jne compare_seg
+
+   mov ax,end_off                 ; check if end_off is 0, this determines
+   cmp ax,0                       ; single address read
+   jne compare_seg
+
+   mov ax,start_seg               ; single address will be read, copy start
+   mov end_seg,ax                 ; to end offsets and segments.
+   mov ax,start_off
+   mov end_off,ax
+
+compare_seg:
+   mov ax,start_seg               ; compare start_seg to end seg
+   cmp ax,end_seg
+   je compare_off                 ; if equal then compare offsets
+   jb compare_success             ; if lesser then start printing
+
+   jmp compare_failure            ; if greater then try again
+
+compare_off:
+   mov ax,start_off               ; if equal then we must compare offsets
+   cmp ax,end_off                 ; if start_off greater then try again
+   ja compare_failure
+
+compare_success:
+   clc
+   ret
+
+compare_failure:
+   stc
+   ret
+
+ENDP
 
 END start

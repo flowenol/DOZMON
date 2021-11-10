@@ -1,22 +1,24 @@
-CR         EQU 0dh
-LF         EQU 0ah
-BKSP       EQU 08h
-BELL       EQU 07h
-SPACE      EQU 20h
-DOT        EQU '.'
-COLON      EQU ':'
-QUIT       EQU 'Q'
-CHEVRON    EQU '>'
+CR           EQU 0dh
+LF           EQU 0ah
+BKSP         EQU 08h
+BELL         EQU 07h
+SPACE        EQU 20h
+DOT          EQU '.'
+COLON        EQU ':'
+QUIT         EQU 'Q'
+CHEVRON      EQU '>'
 
-BUFFER_MAX EQU 128
-PROMPT     EQU '\'
-MAX_ROWS   EQU 25
+BUFFER_MAX   EQU 128
+PROMPT       EQU '\'
+MAX_ROWS     EQU 25
 
-MODE_READ  EQU 00h
-MODE_WRITE EQU 01h
-MODE_FILE  EQU 02h
-MODE_ERROR EQU 03h
-MODE_QUIT  EQU 04h
+MODE_READ    EQU 00h
+MODE_WRITE   EQU 01h
+MODE_FILE    EQU 02h
+MODE_ERROR   EQU 03h
+MODE_QUIT    EQU 04h
+
+WR_BUF_SIZE  EQU 01h
 
 options RECORD clear:1,paging:1,help:1
 

@@ -6,10 +6,10 @@ TLINK_OPT = /v
 all: compile link
 
 compile:
-        $(TASM) $(TASM_OPT) dozmon.asm + tools.asm + args.asm + interpre.asm
+        $(TASM) $(TASM_OPT) dozmon.asm+tools.asm+args.asm+interpre.asm+file.asm
 
 link:
-        $(TLINK) $(TLINK_OPT) dozmon.obj + tools.obj + args.obj + interpre.obj,dozmon.exe,dozmon.map
+        $(TLINK) $(TLINK_OPT) dozmon.obj+tools.obj+args.obj+interpre.obj+file.obj,dozmon.exe,dozmon.map
 
 clean:
         del *.exe 
