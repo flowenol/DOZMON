@@ -26,8 +26,8 @@ help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
                    DB "/h - display help",CR,LF
                    DB CR,LF,'$'
 
-EXTRN option:options
-EXTRN psp:WORD
+EXTRN option:options              ; declared in 'args' module
+EXTRN psp:WORD                    ; declared in 'args' module
 
 GLOBAL input:BYTE:BUFFER_MAX
 GLOBAL input_size:BYTE
@@ -39,6 +39,8 @@ GLOBAL end_seg:WORD
 GLOBAL mode:BYTE
 GLOBAL bytes_wr:BYTE:BUFFER_MAX
 GLOBAL bytes_len:BYTE
+
+EXTRN write_buf:BYTE                 ; declared in 'file' module
 
 .CODE
 
@@ -55,6 +57,10 @@ EXTRN print_address:NEAR          ; declared in 'tools' module
 EXTRN print_at_col:NEAR           ; declared in 'tools' module
 
 EXTRN parse_input:NEAR            ; declared in 'interpret' module
+
+EXTRN create_file:NEAR            ; declared in 'file' module
+EXTRN write_to_file:NEAR          ; declared in 'file' module
+EXTRN close_file:NEAR             ; declared in 'file' module
 
 start:
    mov ax,@data
@@ -280,7 +286,35 @@ file_action:
    jmp file_end
 
 file_bytes:
+   call NEAR PTR create_file
 
+   les di,[dword ptr start_off]   ; load start_off value into es:di 
+
+file_byte:
+   mov al,es:[byte ptr di]        ; load byte from es:di into write_buf
+   mov write_buf,al
+
+   call NEAR PTR write_to_file    ; write byte to file
+
+   mov ax,es                      
+   cmp ax,end_seg                 ; check if current segment equals end_seg
+   jne file_next_byte             ; if not proceed to next byte
+
+   cmp di,end_off                 ; check if current offset equals end_off
+   je file_close                  ; if yes stop writing to file
+
+file_next_byte:
+   inc di                         ; increment current offset by 1
+   jnz file_byte
+
+   mov ax,es                      ; adjust segment if offset overflow detected
+   add ax,1000h
+   mov es,ax
+
+   jmp file_byte
+
+file_close:
+   call NEAR PTR close_file
 
 file_end:
    pop es

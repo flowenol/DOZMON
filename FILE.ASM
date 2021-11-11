@@ -4,7 +4,7 @@
 INCLUDE const.inc
 
 fcb STRUC
-drive_id      DB 0
+drive_id      DB 02h
 filename      DB 8 DUP(0)
 extension     DB 3 DUP(0)
 curr_block    DB 2 DUP(0)
@@ -13,12 +13,15 @@ file_size     DB 4 DUP(0)
 date          DB 2 DUP(0)
 time          DB 2 DUP(0)
 reserved      DB 8 DUP(0)
-curr_record   DB 0
+curr_record   DB 00h
 random_record DB 4 DUP(0)
 fcb ENDS
 
 file          fcb <>
 write_buf     DB 0
+
+f_name        DB 'test    '
+f_ext         DB 'bin'
 
 PUBLIC write_buf
 
@@ -30,7 +33,7 @@ PUBLIC close_file
 
 ; Creates file. Z=0 if error.
 ; 
-; destroys ax,dx
+; destroys ax,dx,cx,si,di
 create_file PROC NEAR
    mov dx,OFFSET file
    mov ah,16h                     ; create file
@@ -40,6 +43,20 @@ create_file PROC NEAR
    jnz create_file_end
    
    mov file.record_size,WR_BUF_SIZE
+
+   mov ax,SEG f_name
+   mov es,ax
+
+   mov cx,8
+   mov si,OFFSET f_name
+   mov di,OFFSET file.filename
+   rep movsb
+
+   mov cx,3
+   mov si,OFFSET f_ext
+   mov di,OFFSET file.extension
+   rep movsb
+
    pushf
 
    mov dx,OFFSET write_buf
