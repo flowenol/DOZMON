@@ -160,15 +160,13 @@ action_table:
 ; Print action                    ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 print_action:
-   push es                        ; save original es segment value
-
    call compare_offsets           ; validate offsets
    jnc print_bytes
-   print BELL   
 
-   jmp print_end
+   jmp error_action
 
 print_bytes:
+   push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
    mov dh,MAX_ROWS + 1            ; set row counter to 26 (max+1)
 
@@ -277,33 +275,46 @@ write_loop_tail:
 ; File action                     ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 file_action:
-   push es                        ; save original es segment value
-
    call compare_offsets           ; validate offsets
    jnc file_bytes
-   print BELL   
 
-   jmp file_end
+   jmp error_action
 
 file_bytes:
    call NEAR PTR create_file
+   jnz error_action
 
+   push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
+   mov bx,OFFSET write_buf
+   mov si,0
 
 file_byte:
    mov al,es:[byte ptr di]        ; load byte from es:di into write_buf
-   mov write_buf,al
+   mov [bx + si],al
+   
+   cmp si,WR_BUF_SIZE - 1
+   jne file_byte1
+   
+   call NEAR PTR write_to_file    ; write to file
+   mov si,-1
 
-   call NEAR PTR write_to_file    ; write byte to file
-
+file_byte1:
    mov ax,es                      
    cmp ax,end_seg                 ; check if current segment equals end_seg
    jne file_next_byte             ; if not proceed to next byte
 
    cmp di,end_off                 ; check if current offset equals end_off
-   je file_close                  ; if yes stop writing to file
+   jne file_next_byte             ; if yes stop writing to file
+
+   cmp si,-1
+   je file_close
+
+   call NEAR PTR write_to_file    ; write to file
+   jmp file_close
 
 file_next_byte:
+   inc si
    inc di                         ; increment current offset by 1
    jnz file_byte
 
@@ -314,10 +325,10 @@ file_next_byte:
    jmp file_byte
 
 file_close:
-   call NEAR PTR close_file
+   call NEAR PTR close_file       ; close file after write is complete
 
 file_end:
-   pop es
+   pop es                         ; restore original es segment contents
    jmp reset_state
 
 
@@ -365,6 +376,8 @@ compare_offsets PROC
    mov end_seg,ax                 ; to end offsets and segments.
    mov ax,start_off
    mov end_off,ax
+
+   jmp compare_success
 
 compare_seg:
    mov ax,start_seg               ; compare start_seg to end seg

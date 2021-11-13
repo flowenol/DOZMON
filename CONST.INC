@@ -18,7 +18,7 @@ MODE_FILE    EQU 02h
 MODE_ERROR   EQU 03h
 MODE_QUIT    EQU 04h
 
-WR_BUF_SIZE  EQU 01h
+WR_BUF_SIZE  EQU 255
 
 options RECORD clear:1,paging:1,help:1
 
