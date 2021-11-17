@@ -295,7 +295,7 @@ file_byte:
    
    cmp si,WR_BUF_SIZE - 1
    jne file_byte1
-   
+
    call NEAR PTR write_to_file    ; write to file
    mov si,-1
 

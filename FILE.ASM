@@ -9,12 +9,12 @@ filename      DB 8 DUP(0)
 extension     DB 3 DUP(0)
 curr_block    DW 00h
 record_size   DW 00h
-file_size     DB 4 DUP(0)
+file_size     DW 2 DUP(0)
 date          DB 2 DUP(0)
 time          DB 2 DUP(0)
 reserved      DB 8 DUP(0)
 curr_record   DB 00h
-random_record DB 4 DUP(0)
+random_record DW 2 DUP(0)
 fcb ENDS
 
 file          fcb <>
@@ -59,28 +59,51 @@ ENDP
 
 ; Writes si bytes in write_buf to file. Z=0 if error.
 ;
-; destroys dx, ax
+; destroys dx, ax, bx, cx, si
 write_to_file PROC NEAR
    mov dx,OFFSET write_buf
    mov ah,1ah                     ; set disk transfer area address
    int 21h
    
    cmp si,WR_BUF_SIZE-1
-   je write_to_file1
-   
-   mov dx,OFFSET file
-   mov ah,24h
-   int 21h
+   je write_to_file2
 
-   mov file.record_size,si
-   inc file.record_size
+   mov ax,word ptr file.file_size   
+   mov word ptr file.random_record,ax
+   mov ax,word ptr file.file_size+2
+   mov word ptr file.random_record+2,ax
 
-   mov ah,22h
-   int 21h 
-   
-   jmp write_to_file_end
+   mov file.record_size,1
+
+   mov cx,si
+   inc cx
+   mov bx,OFFSET write_buf   
+   xor si,si
 
 write_to_file1:
+   mov dx,OFFSET file   
+   mov ah,22h
+   int 21h
+   
+   or al,al
+   pushf
+
+   add file.random_record,1
+   adc file.random_record+1,0
+   adc file.random_record+2,0
+   adc file.random_record+3,0
+
+   inc si
+   mov al,[bx + si]
+   mov write_buf,al
+   
+   popf
+
+   loope write_to_file1
+
+   jmp write_to_file_end
+
+write_to_file2:
    mov file.record_size,si
    inc file.record_size
 
@@ -101,7 +124,6 @@ close_file PROC NEAR
    mov dx,OFFSET file
    mov ah,10h
    int 21h
-
    or al,al
 
    pushf
