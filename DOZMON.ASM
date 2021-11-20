@@ -26,6 +26,10 @@ help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
                    DB "/h - display help",CR,LF
                    DB CR,LF,'$'
 
+file_err_string    DB CR,LF
+                   DB "file access error"
+                   DB '$'
+
 EXTRN option:options              ; declared in 'args' module
 EXTRN psp:WORD                    ; declared in 'args' module
 
@@ -40,7 +44,7 @@ GLOBAL mode:BYTE
 GLOBAL bytes_wr:BYTE:BUFFER_MAX
 GLOBAL bytes_len:BYTE
 
-EXTRN write_buf:BYTE                 ; declared in 'file' module
+EXTRN write_buf:BYTE              ; declared in 'file' module
 
 .CODE
 
@@ -244,8 +248,11 @@ write_action:
    xor ch,ch
    mov cl,bytes_len               ; set cx to number of bytes to write
 
-   jcxz reset_state               ; finish early if no bytes to write
+   cmp cx,0                       ; check if any bytes to write
+   jne write_action1
+   jmp reset_state                ; finish early if no bytes to write
 
+write_action1:
    push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
    
@@ -282,11 +289,12 @@ file_action:
 
 file_bytes:
    call NEAR PTR create_file
-   jnz error_action
+   jnz file_error
 
    push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
    mov bx,OFFSET write_buf
+   jnz file_error
    mov si,0
 
 file_byte:
@@ -297,6 +305,7 @@ file_byte:
    jne file_byte1
 
    call NEAR PTR write_to_file    ; write to file
+   jnz file_error
    mov si,-1
 
 file_byte1:
@@ -311,6 +320,7 @@ file_byte1:
    je file_close
 
    call NEAR PTR write_to_file    ; write to file
+   jnz file_error
    jmp file_close
 
 file_next_byte:
@@ -326,16 +336,23 @@ file_next_byte:
 
 file_close:
    call NEAR PTR close_file       ; close file after write is complete
+   jnz file_error
 
 file_end:
    pop es                         ; restore original es segment contents
    jmp reset_state
+
+file_error:
+   mov bx,OFFSET file_err_string  ; print file error message
+   print_string @data,bx
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Error action                    ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 error_action:
+   mov ax,@data                   ; in case of premature failure restore es
+   mov es,ax
    print BELL
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -360,7 +377,7 @@ finish:
 
 ; Validates start versus end segments & offsets.
 ; Adjusts end segment & offsets for single byte read.
-; C=1 if end segment/offset is below start segmen/offset
+; C=1 if end segment/offset is below start segment/offset
 ;
 ; destroys ax
 compare_offsets PROC
