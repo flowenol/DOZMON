@@ -7,7 +7,7 @@ allowed_chars DB '0123456789'
               DB 'abcdef'
               DB QUIT
               DB CR,BKSP,SPACE
-              DB DOT,COLON,CHEVRON
+              DB DOT,COLON,CHEVRONL,CHEVRONR
 ALLOWED_CHARS_LENGTH EQU ($ - allowed_chars)
 
 .CODE

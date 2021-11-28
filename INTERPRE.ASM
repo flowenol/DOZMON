@@ -71,10 +71,19 @@ determine_mode:
    cmp cl,input_size              ; check if processing first char in buffer
    jne determine_mode1            ; if not proceed
 
-   cmp al,CHEVRON                 ; else check if operation involves file
+   cmp al,CHEVRONR                ; else check if operation involves file
+   jne determine_file             ; if not proceed
+   
+   mov file_flg,1                 ; else set file flag
+   loop determine_mode            ; and get next byte
+   
+   jmp  error_mode                ; if no byte then error mode is determined
+
+determine_file:
+   cmp al,CHEVRONL                ; else check if operation involves file
    jne determine_mode1            ; if not proceed
    
-   mov file_flg,1                 ; else set file flaf
+   mov file_flg,2                 ; else set file flag
    loop determine_mode            ; and get next byte
 
    jmp error_mode                 ; if no byte then error mode is determined
@@ -137,12 +146,19 @@ read_mode2:
    loop read_mode1                ; loop until input buffer is exhausted
 
 read_end:
-   cmp file_flg,1                 ; check if file operation flag was set
-   jne read_end1                  ; if not proceed
-   mov mode,MODE_FILE             ; else determine file mode
+   cmp file_flg,0                 ; check if file operation flag was not set
+   je read_end2                   ; if not proceed 
+
+   cmp file_flg,1                 ; check if file_flag was set with proper char
+   jne read_end1                  ; if not then error
+
+   mov mode,MODE_FILEW            ; else determine write memory to file mode
    jmp all_parsed                 ; and finish
 
 read_end1:
+   jmp error_mode
+
+read_end2:
    mov mode,MODE_READ             ; determine plain read mode
    jmp all_parsed                 ; and finish
 
@@ -152,28 +168,46 @@ read_end1:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 write_mode:
    dec cx                         ; decrement cx due to detected colon char
+
+   cmp file_flg,0
+   je write_mode1
+
+   cmp file_flg,2                 ; check if proper file operation flag was set
+   jne write_mode_err             ; error if not
+
+   mov mode,MODE_FILER            ; else determine write memory from file mode
+
+   cmp cx,0                       ; there must be no remaining bytes in buffer
+   jne write_mode_err             ; for write memory from file mode
+
+   jmp write_end
+
+write_mode_err:
+   jmp error_mode
+
+write_mode1:
    mov mode,MODE_WRITE            ; determine the mode to MODE_WRITE
    mov byte_wr,0                  ; clear actual byte variable
    mov byte_flg,0                 ; clear byte boundary detection flag
 
    jcxz write_end                 ; if there is no input to process then finish
 
-write_mode1:
+write_mode2:
    lodsb                          ; load char from input
 
    call hex_char                  ; check if char is hex
-   jnz write_mode4                ; if yes then parse byte 
+   jnz write_mode5                ; if yes then parse byte 
 
    cmp al,SPACE                   ; check if char is SPACE
-   jne write_mode2                ; if not then determine error mode
+   jne write_mode3                ; if not then determine error mode
    cmp byte_flg,0                 ; check if this SPACE is a byte boundary
-   je write_mode5                 ; if not then proceed to next char
-   jmp write_mode3                ; if yes then finish and save the byte
+   je write_mode6                 ; if not then proceed to next char
+   jmp write_mode4                ; if yes then finish and save the byte
 
-write_mode2:
+write_mode3:
    jmp error_mode
 
-write_mode3:                      
+write_mode4:                      
    xor bx,bx
    mov bl,bytes_len 
    mov di,bx                      ; load current parsed byte count into di
@@ -185,9 +219,9 @@ write_mode3:
    mov byte_flg,0                 ; clear byte boundary helper flag
    inc bytes_len                  ; increment bytes count
 
-   jmp write_mode5                ; jump to loop tail
+   jmp write_mode6                ; jump to loop tail
   
-write_mode4:
+write_mode5:
    shl byte_wr,1                  ; shift currently parsed byte left x4 times
    shl byte_wr,1
    shl byte_wr,1
@@ -196,8 +230,8 @@ write_mode4:
    or byte_wr,al                  ; add lower 4 bits to curently parsed byte
    mov byte_flg,1                 ; set byte boundary helper flag
 
-write_mode5:
-   loop write_mode1               ; loop until input buffer is exhausted
+write_mode6:
+   loop write_mode2               ; loop until input buffer is exhausted
 
    cmp byte_flg,1                 ; check if unfinished byte is pending
    jne write_end                  ; if not then finish
@@ -226,6 +260,9 @@ quit_mode:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 error_mode:
    mov mode,MODE_ERROR            ; determine error mode
+   mov file_flg,0                 ; clear helper variables
+   mov byte_wr,0
+   mov byte_flg,0
    retn
 
 all_parsed:
@@ -264,7 +301,9 @@ hex_char PROC
    je hex_char_end
    cmp al,COLON
    je hex_char_end
-   cmp al,CHEVRON
+   cmp al,CHEVRONR
+   je hex_char_end
+   cmp al,CHEVRONL
    je hex_char_end
    cmp al,BKSP
    je hex_char_end

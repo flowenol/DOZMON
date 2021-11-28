@@ -27,9 +27,37 @@ PUBLIC write_buf
 
 .CODE
 
+PUBLIC open_file
 PUBLIC create_file
 PUBLIC write_to_file
 PUBLIC close_file
+
+; Opens file. Z=0 if error.
+; 
+; destroys ax,dx,cx,si,di
+open_file PROC NEAR
+   mov ax,SEG f_name
+   mov es,ax
+
+   mov cx,8
+   mov si,OFFSET f_name
+   mov di,OFFSET file.filename
+   rep movsb
+
+   mov cx,3
+   mov si,OFFSET f_ext
+   mov di,OFFSET file.extension
+   rep movsb
+
+   mov dx,OFFSET file             ; open file
+   mov ah,0fh                     
+   int 21h
+
+   or al,al                       ; and check status
+
+   retn
+ENDP
+
 
 ; Creates file. Z=0 if error.
 ; 

@@ -62,6 +62,7 @@ EXTRN print_at_col:NEAR           ; declared in 'tools' module
 
 EXTRN parse_input:NEAR            ; declared in 'interpret' module
 
+EXTRN open_file:NEAR              ; declared in 'file' module
 EXTRN create_file:NEAR            ; declared in 'file' module
 EXTRN write_to_file:NEAR          ; declared in 'file' module
 EXTRN close_file:NEAR             ; declared in 'file' module
@@ -155,7 +156,8 @@ parse:
 action_table:
    DW OFFSET print_action
    DW OFFSET write_action
-   DW OFFSET file_action
+   DW OFFSET filew_action
+   DW OFFSET filer_action
    DW OFFSET error_action
    DW OFFSET finish
 
@@ -279,72 +281,143 @@ write_loop_tail:
    jmp reset_state
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; File action                     ;
+; File write action               ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-file_action:
+filew_action:
    call compare_offsets           ; validate offsets
-   jnc file_bytes
+   jnc filew_bytes
 
    jmp error_action
 
-file_bytes:
+filew_bytes:
    call NEAR PTR create_file
-   jnz file_error
+   jnz filew_error
 
    push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
    mov bx,OFFSET write_buf
-   jnz file_error
+   jnz filew_error
    mov si,0
 
-file_byte:
+filew_byte:
    mov al,es:[byte ptr di]        ; load byte from es:di into write_buf
    mov [bx + si],al
    
    cmp si,WR_BUF_SIZE - 1
-   jne file_byte1
+   jne filew_byte1
 
    call NEAR PTR write_to_file    ; write to file
-   jnz file_error
+   jnz filew_error
    mov si,-1
 
-file_byte1:
+filew_byte1:
    mov ax,es                      
    cmp ax,end_seg                 ; check if current segment equals end_seg
-   jne file_next_byte             ; if not proceed to next byte
+   jne filew_next_byte             ; if not proceed to next byte
 
    cmp di,end_off                 ; check if current offset equals end_off
-   jne file_next_byte             ; if yes stop writing to file
+   jne filew_next_byte             ; if yes stop writing to file
 
    cmp si,-1
-   je file_close
+   je filew_close
 
    call NEAR PTR write_to_file    ; write to file
-   jnz file_error
-   jmp file_close
+   jnz filew_error
+   jmp filew_close
 
-file_next_byte:
+filew_next_byte:
    inc si
    inc di                         ; increment current offset by 1
-   jnz file_byte
+   jnz filew_byte
 
    mov ax,es                      ; adjust segment if offset overflow detected
    add ax,1000h
    mov es,ax
 
-   jmp file_byte
+   jmp filew_byte
 
-file_close:
+filew_close:
    call NEAR PTR close_file       ; close file after write is complete
-   jnz file_error
+   jnz filew_error
 
-file_end:
+filew_end:
    pop es                         ; restore original es segment contents
    jmp reset_state
 
-file_error:
+filew_error:
    mov bx,OFFSET file_err_string  ; print file error message
    print_string @data,bx
+   jmp error_action
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; File read action                ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+filer_action:
+   call compare_offsets           ; validate offsets
+   jnc filer_bytes
+
+   jmp error_action
+
+filer_bytes:
+   call NEAR PTR create_file
+   jnz filer_error
+
+   push es                        ; save original es segment value
+   les di,[dword ptr start_off]   ; load start_off value into es:di 
+   mov bx,OFFSET write_buf
+   jnz filer_error
+   mov si,0
+
+filer_byte:
+   mov al,es:[byte ptr di]        ; load byte from es:di into write_buf
+   mov [bx + si],al
+   
+   cmp si,WR_BUF_SIZE - 1
+   jne filer_byte1
+
+   call NEAR PTR write_to_file    ; write to file
+   jnz filer_error
+   mov si,-1
+
+filer_byte1:
+   mov ax,es                      
+   cmp ax,end_seg                 ; check if current segment equals end_seg
+   jne filer_next_byte             ; if not proceed to next byte
+
+   cmp di,end_off                 ; check if current offset equals end_off
+   jne filer_next_byte             ; if yes stop writing to file
+
+   cmp si,-1
+   je filer_close
+
+   call NEAR PTR write_to_file    ; write to file
+   jnz filer_error
+   jmp filer_close
+
+filer_next_byte:
+   inc si
+   inc di                         ; increment current offset by 1
+   jnz filer_byte
+
+   mov ax,es                      ; adjust segment if offset overflow detected
+   add ax,1000h
+   mov es,ax
+
+   jmp filer_byte
+
+filer_close:
+   call NEAR PTR close_file       ; close file after write is complete
+   jnz filer_error
+
+filer_end:
+   pop es                         ; restore original es segment contents
+   jmp reset_state
+
+filer_error:
+   mov bx,OFFSET file_err_string  ; print file error message
+   print_string @data,bx
+   jmp error_action
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
