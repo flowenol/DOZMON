@@ -44,7 +44,7 @@ GLOBAL mode:BYTE
 GLOBAL bytes_wr:BYTE:BUFFER_MAX
 GLOBAL bytes_len:BYTE
 
-EXTRN write_buf:BYTE              ; declared in 'file' module
+EXTRN file_buf:BYTE               ; declared in 'file' module
 
 .CODE
 
@@ -64,6 +64,7 @@ EXTRN parse_input:NEAR            ; declared in 'interpret' module
 
 EXTRN open_file:NEAR              ; declared in 'file' module
 EXTRN create_file:NEAR            ; declared in 'file' module
+EXTRN read_from_file:NEAR         ; declared in 'file' module
 EXTRN write_to_file:NEAR          ; declared in 'file' module
 EXTRN close_file:NEAR             ; declared in 'file' module
 
@@ -295,12 +296,12 @@ filew_bytes:
 
    push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
-   mov bx,OFFSET write_buf
+   mov bx,OFFSET file_buf
    jnz filew_error
    mov si,0
 
 filew_byte:
-   mov al,es:[byte ptr di]        ; load byte from es:di into write_buf
+   mov al,es:[byte ptr di]        ; load byte from es:di into file_buf
    mov [bx + si],al
    
    cmp si,WR_BUF_SIZE - 1
@@ -360,41 +361,25 @@ filer_action:
    jmp error_action
 
 filer_bytes:
-   call NEAR PTR create_file
+   call NEAR PTR open_file
    jnz filer_error
 
    push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
-   mov bx,OFFSET write_buf
+   mov bx,OFFSET file_buf
    jnz filer_error
-   mov si,0
 
 filer_byte:
-   mov al,es:[byte ptr di]        ; load byte from es:di into write_buf
-   mov [bx + si],al
-   
-   cmp si,WR_BUF_SIZE - 1
-   jne filer_byte1
-
-   call NEAR PTR write_to_file    ; write to file
-   jnz filer_error
-   mov si,-1
-
-filer_byte1:
-   mov ax,es                      
-   cmp ax,end_seg                 ; check if current segment equals end_seg
-   jne filer_next_byte             ; if not proceed to next byte
-
-   cmp di,end_off                 ; check if current offset equals end_off
-   jne filer_next_byte             ; if yes stop writing to file
-
-   cmp si,-1
+   call NEAR PTR read_from_file
+   cmp al,1
    je filer_close
-
-   call NEAR PTR write_to_file    ; write to file
+   
+   or al,al
    jnz filer_error
-   jmp filer_close
-
+   
+   mov al,[bx]                    ; load byte from file_buf
+   mov es:[byte ptr di],al        ; and save at es:di
+   
 filer_next_byte:
    inc si
    inc di                         ; increment current offset by 1

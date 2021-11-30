@@ -18,17 +18,18 @@ random_rec    DW 2 DUP(0)
 fcb ENDS
 
 file          fcb <>             ; file structure
-write_buf     DB WR_BUF_SIZE DUP(0)
+file_buf      DB WR_BUF_SIZE DUP(0)
 
 f_name        DB 'test    '
 f_ext         DB 'bin'
 
-PUBLIC write_buf
+PUBLIC file_buf
 
 .CODE
 
 PUBLIC open_file
 PUBLIC create_file
+PUBLIC read_from_file
 PUBLIC write_to_file
 PUBLIC close_file
 
@@ -85,12 +86,33 @@ create_file PROC NEAR
    retn
 ENDP
 
-; Writes si bytes in write_buf to file. Z=0 if error.
+; Reads single byte from file to file_buf. Z=0 if error. 
+; al=01 if EOF.
+;
+; destroys ax,dx
+read_from_file PROC NEAR
+   mov dx,OFFSET file_buf
+   mov ah,1ah                     ; set disk transfer area address to file_buf
+   int 21h
+
+   mov file.rec_size,1            ; and set the record size to 1 byte
+
+   mov dx,OFFSET file             ; read from file
+   mov ah,14h
+   int 21h
+
+   or al,al                       ; check status
+
+   retn
+ENDP
+
+
+; Writes si bytes in file_buf to file. Z=0 if error.
 ;
 ; destroys dx,ax,bx,cx,si
 write_to_file PROC NEAR
-   mov dx,OFFSET write_buf
-   mov ah,1ah                     ; set disk transfer area address to write_buf
+   mov dx,OFFSET file_buf
+   mov ah,1ah                     ; set disk transfer area address to file_buf
    int 21h
    
    cmp si,WR_BUF_SIZE-1           ; if si is equal to buffer size
@@ -105,7 +127,7 @@ write_to_file PROC NEAR
 
    mov cx,si                      ; set cx to the number of bytes in buffer
    inc cx
-   mov bx,OFFSET write_buf        ; set bx to buffer offset
+   mov bx,OFFSET file_buf         ; set bx to buffer offset
    xor si,si
 
 write_to_file1:
@@ -121,9 +143,9 @@ write_to_file1:
    adc file.random_rec+2,0
    adc file.random_rec+3,0
 
-   inc si                         ; write next byte in write_buf to 1st
+   inc si                         ; write next byte in file_buf to 1st
    mov al,[bx + si]               ; position
-   mov write_buf,al
+   mov file_buf,al
    
    popf                           ; restore check status
 
