@@ -14,6 +14,7 @@ ALLOWED_CHARS_LENGTH EQU ($ - allowed_chars)
 
 INCLUDE macros.inc
 
+PUBLIC read_str
 PUBLIC wait_for_char
 PUBLIC read_char
 PUBLIC print_number
@@ -21,6 +22,47 @@ PUBLIC cls
 PUBLIC print_address
 PUBLIC print_hex
 PUBLIC print_at_col
+
+; Reads from standard input a string of max si 
+; length into es:di
+;
+; destroys cx,ax,di
+read_str PROC NEAR
+   mov cx,si                      ; ensure max si characters in string
+   cld                            ; ensure incrementing di for stosb
+
+read_str_char:
+   mov ah,08h                     ; read char into al
+   int 21h
+
+   cmp al,BKSP                    ; check if the character is backspace
+   jne read_str_nobksp            ; if no handle normal character
+
+   cmp cx,si                      ; else check if not first character
+   je read_str_char               ; if first char just read next char
+
+   inc cx                         ; else fix cx and di
+   dec di
+
+   mov byte ptr es:[di],0         ; clear the corresponding character in buffer
+
+   print BKSP                     ; and print backspace
+   print SPACE
+   print BKSP
+   
+   jmp read_str_char              ; then read next char
+
+read_str_nobksp:
+
+   print al                       ; print the char
+
+   stosb                          ; store the char in destination buffer
+
+   cmp al,CR                      ; terminate if char is CR
+   loopne read_str_char           ; or the buffer is depleted
+
+   retn
+ENDP
 
 ; Loops until char declared in al is
 ; read from keyboard

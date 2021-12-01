@@ -20,12 +20,15 @@ fcb ENDS
 file          fcb <>             ; file structure
 file_buf      DB WR_BUF_SIZE DUP(0)
 
-f_name        DB 'test    '
-f_ext         DB 'bin'
+fname_buf     DB 12 DUP(0)
+
+file_str      DB CR,LF,"enter filename: ",'$'
 
 PUBLIC file_buf
 
 .CODE
+
+INCLUDE macros.inc
 
 PUBLIC open_file
 PUBLIC create_file
@@ -33,22 +36,32 @@ PUBLIC read_from_file
 PUBLIC write_to_file
 PUBLIC close_file
 
+EXTRN read_str:NEAR
+
 ; Opens file. Z=0 if error.
 ; 
 ; destroys ax,dx,cx,si,di
 open_file PROC NEAR
-   mov ax,SEG f_name
+   mov bx,OFFSET file_str
+   print_string @data,bx
+
+   mov ax,SEG fname_buf
    mov es,ax
+   mov di,OFFSET fname_buf
+   mov si,12
+   call NEAR PTR read_str
 
-   mov cx,8
-   mov si,OFFSET f_name
-   mov di,OFFSET file.filename
-   rep movsb
+   mov si,OFFSET fname_buf
+   mov ax,SEG file
+   mov es,ax
+   mov di,OFFSET file
+   mov al,1                       ; scan off leading file name separators
 
-   mov cx,3
-   mov si,OFFSET f_ext
-   mov di,OFFSET file.extension
-   rep movsb
+   mov ah,29h                     ; parse filename into file
+   int 21h 
+
+   or al,al                       ; and check status
+   jnz open_file_end              ; terminate prematurely on error
 
    mov dx,OFFSET file             ; open file
    mov ah,0fh                     
@@ -56,6 +69,7 @@ open_file PROC NEAR
 
    or al,al                       ; and check status
 
+open_file_end:
    retn
 ENDP
 
@@ -64,18 +78,26 @@ ENDP
 ; 
 ; destroys ax,dx,cx,si,di
 create_file PROC NEAR
-   mov ax,SEG f_name
+   mov bx,OFFSET file_str
+   print_string @data,bx
+
+   mov ax,SEG fname_buf
    mov es,ax
+   mov di,OFFSET fname_buf
+   mov si,12
+   call NEAR PTR read_str
 
-   mov cx,8
-   mov si,OFFSET f_name
-   mov di,OFFSET file.filename
-   rep movsb
+   mov si,OFFSET fname_buf
+   mov ax,SEG file
+   mov es,ax
+   mov di,OFFSET file
+   mov al,1                       ; scan off leading file name separators
 
-   mov cx,3
-   mov si,OFFSET f_ext
-   mov di,OFFSET file.extension
-   rep movsb
+   mov ah,29h                     ; parse filename into file
+   int 21h 
+
+   or al,al                       ; and check status
+   jnz create_file_end            ; terminate prematurely on error
 
    mov dx,OFFSET file             ; create file
    mov ah,16h                     
@@ -83,6 +105,7 @@ create_file PROC NEAR
 
    or al,al                       ; and check status
 
+create_file_end:
    retn
 ENDP
 
