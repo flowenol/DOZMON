@@ -23,6 +23,7 @@ file_buf      DB WR_BUF_SIZE DUP(0)
 fname_buf     DB 12 DUP(0)
 
 file_str      DB CR,LF,"enter filename: ",'$'
+file_size_str DB CR,LF,"file size: ",'$'
 
 PUBLIC file_buf
 
@@ -37,6 +38,7 @@ PUBLIC write_to_file
 PUBLIC close_file
 
 EXTRN read_str:NEAR
+EXTRN print_number:NEAR
 
 ; Opens file. Z=0 if error.
 ; 
@@ -68,7 +70,24 @@ open_file PROC NEAR
    int 21h
 
    or al,al                       ; and check status
+   jnz open_file_end              ; terminate prematurely on error
+   pushf                          ; preserve status
 
+   mov bx,OFFSET file_size_str    ; print file size
+   print_string @data,bx
+
+   sub sp,4                       
+   mov bx,sp
+
+   mov ax,file.file_size          ; copy file size to stack parameter for
+   mov word ptr ss:[bx],ax        ; print number
+   mov ax,file.file_size + 2
+   mov word ptr ss:[bx + 2],ax
+
+   call NEAR PTR print_number
+   add sp,4                       ; restore stack
+
+   popf                           ; restore status
 open_file_end:
    retn
 ENDP
