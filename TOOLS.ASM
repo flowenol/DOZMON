@@ -22,6 +22,7 @@ PUBLIC cls
 PUBLIC print_address
 PUBLIC print_hex
 PUBLIC print_at_col
+PUBLIC div_by_10
 
 ; Reads from standard input a string of max si 
 ; length into es:di
@@ -112,34 +113,43 @@ found:
    retn
 ENDP
 
-; Prints unsigned integer number 
-; from byte in al
+; Prints unsigned 32 bit integer number 
+; from bytes on stack
 ;
-; destroys: ax, dx, si
+; destroys: ax, bx, cx, dx, si
 print_number PROC NEAR
-   push bp                        ; set stack frame with 4 bytes for local
-   mov bp,sp                      ; string variable
-   sub sp,4
-   mov byte ptr [bp - 1],'$'      ; write "$" to highest byte in stack frame
+   push bp                        ; set stack frame with 11 bytes for
+   mov bp,sp                      ; number string variable
+   sub sp,11
+   mov byte ptr [bp - 1],'$'      ; put string termination at highest byte
+   mov si,0 
+   
+   sub sp,5                       ; reserve 5 bytes on stack for number and
+   mov bx,sp                      ; remainder
+   mov ax,[bp + 4]                ; copy argument for dicision
+   mov word ptr ss:[bx + 1],ax
+   mov ax,[bp + 6]
+   mov word ptr ss:[bx + 3],ax
 
-   mov si,1                       ; initialize si with 1 (si goes negative)
+calc_digit:
+   call NEAR PTR div_by_10        ; divide with remainder
+   mov bx,sp
+   mov al,ss:[bx]                 ; convert remainder to ASCII digit
+   add al,30h
+   dec si                         ; decrement digit index in string
+   mov byte ptr [bp + si - 1],al  ; store ASCII digit in string
+   
+   mov ax,word ptr ss:[bx + 1]    ; check if quotient is 0
+   or ax,word ptr ss:[bx + 3]
 
-divide_by_10:
-   mov dl,10                       
-   xor ah,ah                      ; clear highest byte in ax
-   div dl                         ; divide ax by 10
-   dec si                          
-   mov [bp + si - 2],ah           ; put remainder to next byte in stack frame
-   add byte ptr [bp + si - 2],30h ; convert to char
-   cmp al,0                       ; finish if al == 0
-   jne divide_by_10
+   jnz calc_digit                 ; if not repeat division
 
-   push ss                        ; copy ss to bx - segment parameter for
-   pop bx                         ; dos print string function
-   lea dx,[bp - si - 2]           ; load lowest assigned byte offset to dx
-   print_string bx,dx             ; print string
+   mov bx,ss                      ; get stack segment for string print
+   lea dx,[bp + si - 1]           ; get effective offset for string beginning
+   print_string bx,dx             ; and print string
 
-   add sp,4                       ; restore previous frame and stack
+   add sp,5                       ; restore stack: 5 bytes for quotient and r
+   add sp,11                      ; restore stack: 11 bytes for number string
    pop bp
    retn
 ENDP
@@ -149,19 +159,19 @@ ENDP
 ;
 ; destroys ax,dx,cx,bh
 cls PROC NEAR
-   mov dl,79                       ; dl,dh = x,y of right corner of window
+   mov dl,79                      ; dl,dh = x,y of right corner of window
    mov dh,24 
-   mov cx,0                        ; cl,ch = x,y of upper left corner of window
-   mov bh,07h                      ; display attribute to use
+   mov cx,0                       ; cl,ch = x,y of upper left corner of window
+   mov bh,07h                     ; display attribute to use
   
-   mov ah,06h                      ; scroll or initialize window function
-   mov al,0                        ; zero lines to scroll
-   int 10h                         ; call ROM BIOS video driver
+   mov ah,06h                     ; scroll or initialize window function
+   mov al,0                       ; zero lines to scroll
+   int 10h                        ; call ROM BIOS video driver
 
-   mov dx,0                        ; set cursor position in dx to 0,0
-   mov bh,0                        ; set page 0
-   mov ah,2                        ; select cursor position function
-   int 10h                         ; call ROM BIOS video driver
+   mov dx,0                       ; set cursor position in dx to 0,0
+   mov bh,0                       ; set page 0
+   mov ah,2                       ; select cursor position function
+   int 10h                        ; call ROM BIOS video driver
    retn
 ENDP
 
@@ -169,17 +179,14 @@ ENDP
 ;
 ; destroys ax,cl
 print_address PROC NEAR
-   push bp                         ; save bp
-   mov bp,sp                       ; set new stack frame
-   sub sp,3                        ; reserve 3 bytes on stack for real address
-                                   ; calculation
+   push bp                        ; save bp
+   mov bp,sp                      ; set new stack frame
+   sub sp,3                       ; reserve 3 bytes on stack for real address
+                                  ; calculation
 
-   mov ax,es                       ; move segment register to ax
-   shl ax,1                        ; rotate MSBit in ax into the highest
-   rcl byte ptr [bp - 1],1         ; byte on stack frame, 4x times
-
-   shl ax,1   
-   rcl byte ptr [bp - 1],1
+   mov ax,es                      ; move segment register to ax
+   shl ax,1                       ; rotate MSBit in ax into the highest
+   rcl byte ptr [bp - 1],1        ; byte on stack frame, 4x times
 
    shl ax,1   
    rcl byte ptr [bp - 1],1
@@ -187,24 +194,27 @@ print_address PROC NEAR
    shl ax,1   
    rcl byte ptr [bp - 1],1
 
-   add ax,di                       ; sum shifted segment and offset
-   adc byte ptr [bp - 1],0         ; add carry to highest byte on stack frame
+   shl ax,1   
+   rcl byte ptr [bp - 1],1
 
-   mov word ptr [bp - 3],ax        ; save sum (4 address nibbles) on stack frame
+   add ax,di                      ; sum shifted segment and offset
+   adc byte ptr [bp - 1],0        ; add carry to highest byte on stack frame
+
+   mov word ptr [bp - 3],ax       ; save sum (4 address nibbles) on stack frame
    
-   mov al,[bp - 1]                 ; print MSB nibble of real address
-   call print_nibble               ; from highest byte on stack frame
+   mov al,[bp - 1]                ; print MSB nibble of real address
+   call print_nibble              ; from highest byte on stack frame
 
-   mov cl,12                       ; set cl for 12 right shifts
+   mov cl,12                      ; set cl for 12 right shifts
 
 print_nibbles:
-   mov ax,word ptr [bp - 3]        ; set ax to remaining nibbles
-   shr ax,cl                       ; shift right to get next nibble in al
+   mov ax,word ptr [bp - 3]       ; set ax to remaining nibbles
+   shr ax,cl                      ; shift right to get next nibble in al
    call print_nibble             
-   sub cl,4                        ; decrement cl by nibble length
-   jns print_nibbles               ; branch till cl becomes negative
+   sub cl,4                       ; decrement cl by nibble length
+   jns print_nibbles              ; branch till cl becomes negative
 
-   add sp,3                        ; restore original stack frame
+   add sp,3                       ; restore original stack frame
    pop bp
    retn
 ENDP
@@ -232,47 +242,47 @@ ENDP
 ;
 ; destroys ah,bh,dx
 print_at_col PROC NEAR
-  push cx                         ; save cx
-  push bp                         ; save current stack frame
-  mov bp,sp                       ; set new stack frame
-  sub sp,1                        ; reserve 1 byte on stack for current column
+   push cx                        ; save cx
+   push bp                        ; save current stack frame
+   mov bp,sp                      ; set new stack frame
+   sub sp,1                       ; reserve 1 byte on stack for current column
 
-  mov bh,00h                      ; set page 0  
+   mov bh,00h                     ; set page 0  
 
-  push ax                         ; save column parameter in ah
-  mov ah,03h                      ; read current cursor position into dh:dl 
-  int 10h
+   push ax                        ; save column parameter in ah
+   mov ah,03h                     ; read current cursor position into dh:dl 
+   int 10h
 
-  mov [bp - 1],dl                 ; save original cursor column
+   mov [bp - 1],dl                ; save original cursor column
                                   ; note: original row still in dh
  
-  pop ax                          ; restore column parameter in ah
-  mov dl,ah                       ; set destination column in dl
-  mov ah,02h                      ; set cursor position at destination column
-  int 10h
+   pop ax                         ; restore column parameter in ah
+   mov dl,ah                      ; set destination column in dl
+   mov ah,02h                     ; set cursor position at destination column
+   int 10h
 
-  cmp al,SPACE
-  jb print_dot
+   cmp al,SPACE
+   jb print_dot
 
-  cmp al,7eh
-  ja print_dot
+   cmp al,7eh
+   ja print_dot
 
-  print al
-  jmp restore_col
+   print al
+   jmp restore_col
 
 print_dot:
-  print DOT  
+   print DOT  
 
 restore_col:
-  mov dl,[bp - 1]                 ; set column to the original
-  mov ah,02h                      ; set cursor position at original column
-  int 10h
+   mov dl,[bp - 1]                ; set column to the original
+   mov ah,02h                     ; set cursor position at original column
+   int 10h
   
 
-  add sp,1                        ; destroy local variable
-  pop bp                          ; restore stack frame pointer
-  pop cx                          ; restore cx
-  retn
+   add sp,1                       ; destroy local variable
+   pop bp                         ; restore stack frame pointer
+   pop cx                         ; restore cx
+   retn
 ENDP
 
 ; Prints lower nibble in al
@@ -292,5 +302,199 @@ hex_nibble:
    ret
 ENDP
 
+div_by_10 PROC NEAR
+   push bp                        ; preserve frame pointer
+   mov bp,sp
+   sub sp,8                       ; reserve 8 bytes on stack for quotient
+   mov bx,sp                      ; and remainder
+
+   xor ax,ax                      ; r = q = 0
+   mov word ptr ss:[bx],ax        ; q 
+   mov word ptr ss:[bx + 2],ax    ; q + 2
+   mov word ptr ss:[bx + 4],ax    ; r
+   mov word ptr ss:[bx + 6],ax    ; r + 2
+
+   mov cx,8                       ; i = 31
+div_loop1:
+   dec cl
+
+   shl byte ptr ss:[bx + 4],1     ; r <<= 1
+   rcl byte ptr ss:[bx + 5],1
+   rcl byte ptr ss:[bx + 6],1
+   rcl byte ptr ss:[bx + 7],1
+
+   mov ax,1                       ; 1 << i
+   shl ax,cl
+
+   mov dl,[bp + 8]                ; n & (1 << i)
+   and dl,al
+   jz zero1
+
+   or byte ptr ss:[bx + 4],1      ; r |= n & (1 << i) > ? 1 : 0
+   
+zero1:
+   mov al,ss:[bx + 4]             ; r > d ?
+   cmp al,10
+   jge larger1
+
+   xor al,al
+   or al,ss:[bx + 5]
+   or al,ss:[bx + 6]
+   or al,ss:[bx + 7]
+   jz div_loop_end1
+
+larger1:
+   mov ax,1                       ; q |= 1 << i
+   shl ax,cl
+   or ss:[bx + 3],al 
+
+   mov ax,10                      ; r = r - 10
+   sub word ptr ss:[bx + 4],ax
+   sbb word ptr ss:[bx + 6],0
+   
+div_loop_end1:
+   inc cl
+   loop div_loop1
+
+   mov cx,8
+div_loop2:
+   dec cl
+
+   shl byte ptr ss:[bx + 4],1
+   rcl byte ptr ss:[bx + 5],1
+   rcl byte ptr ss:[bx + 6],1
+   rcl byte ptr ss:[bx + 7],1
+
+   mov ax,1
+   shl ax,cl
+
+   mov dl,[bp + 7]
+   and dl,al
+   jz zero2
+
+   or byte ptr ss:[bx + 4],1
+   
+zero2:
+   mov al,ss:[bx + 4]
+   cmp al,10
+   jge larger2
+
+   xor al,al
+   or al,ss:[bx + 5]
+   or al,ss:[bx + 6]
+   or al,ss:[bx + 7]
+   jz div_loop_end2
+
+larger2:
+   mov ax,1                       ; q |= 1 << i
+   shl ax,cl
+   or ss:[bx + 2],al 
+
+   mov ax,10                      ; r = r - 10
+   sub word ptr ss:[bx + 4],ax
+   sbb word ptr ss:[bx + 6],0
+   
+div_loop_end2:
+   inc cl
+   loop div_loop2
+
+   mov cx,8
+div_loop3:
+   dec cl
+
+   shl byte ptr ss:[bx + 4],1
+   rcl byte ptr ss:[bx + 5],1
+   rcl byte ptr ss:[bx + 6],1
+   rcl byte ptr ss:[bx + 7],1
+
+   mov ax,1
+   shl ax,cl
+
+   mov dl,[bp + 6]
+   and dl,al
+   jz zero3
+
+   or byte ptr ss:[bx + 4],1
+   
+zero3:
+   mov al,ss:[bx + 4]
+   cmp al,10
+   jge larger3
+
+   xor al,al
+   or al,ss:[bx + 5]
+   or al,ss:[bx + 6]
+   or al,ss:[bx + 7]
+   jz div_loop_end3
+
+larger3:
+   mov ax,1                       ; q |= 1 << i
+   shl ax,cl   
+   or ss:[bx + 1],al 
+
+   mov ax,10                      ; r = r - 10
+   sub word ptr ss:[bx + 4],ax
+   sbb word ptr ss:[bx + 6],0
+   
+div_loop_end3:   
+   inc cl
+   loop div_loop3
+
+   mov cx,8
+div_loop4:
+   dec cl
+
+   shl byte ptr ss:[bx + 4],1
+   rcl byte ptr ss:[bx + 5],1
+   rcl byte ptr ss:[bx + 6],1
+   rcl byte ptr ss:[bx + 7],1
+
+   mov ax,1
+   shl ax,cl
+
+   mov dl,[bp + 5]
+   and dl,al
+   jz zero4
+
+   or byte ptr ss:[bx + 4],1
+   
+zero4:
+   mov al,ss:[bx + 4]
+   cmp al,10
+   jge larger4
+
+   xor al,al
+   or al,ss:[bx + 5]
+   or al,ss:[bx + 6]
+   or al,ss:[bx + 7]
+   jz div_loop_end4
+
+larger4:
+   mov ax,1                       ; q |= 1 << i
+   shl ax,cl
+   or ss:[bx],al 
+
+   mov ax,10                      ; r = r - 10
+   sub word ptr ss:[bx + 4],ax
+   sbb word ptr ss:[bx + 6],0
+   
+div_loop_end4:   
+   inc cl
+   loop div_loop4
+
+
+   mov al,ss:[bx + 4]             ; r
+   mov byte ptr ss:[bp + 4],al    ; result r
+
+   mov ax,ss:[bx]                 ; q
+   mov word ptr ss:[bp + 5],ax    ; result q
+
+   mov ax,ss:[bx + 2]             ; q + 2
+   mov word ptr ss:[bp + 7],ax    ; result q + 2
+
+   add sp,8                       ; restore previous stack frame
+   pop bp   
+   retn
+ENDP
 
 END
