@@ -71,15 +71,16 @@ determine_mode:
    cmp cl,input_size              ; check if processing first char in buffer
    jne determine_mode1            ; if not proceed
 
+determine_file:
    cmp al,CHEVRONR                ; else check if operation involves file
-   jne determine_file             ; if not proceed
+   jne determine_file1            ; if not proceed
    
    mov file_flg,1                 ; else set file flag
    loop determine_mode            ; and get next byte
    
-   jmp  error_mode                ; if no byte then error mode is determined
+   jmp error_mode                 ; if no byte then error mode is determined
 
-determine_file:
+determine_file1:
    cmp al,CHEVRONL                ; else check if operation involves file
    jne determine_mode1            ; if not proceed
    
@@ -116,6 +117,11 @@ determine_mode3:
    inc cx                         ; if end was reached then we must increment
                                   ; cx by 1 to counter the decrement in
                                   ; read_mode label
+
+   cmp file_flg,2                 ; check if write memory from file mode is on
+   jne read_mode                  ; if not proceed with standard read mode
+
+   jmp write_mode                 ; determine write memory mode if yes
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Read mode                       ;
