@@ -22,7 +22,7 @@ file_buf      DB WR_BUF_SIZE DUP(0)
 
 fname_buf     DB 12 DUP(0)
 
-file_str      DB CR,LF,"enter filename: ",'$'
+file_str      DB CR,LF,"enter file name: ",'$'
 file_size_str DB CR,LF,"file size: ",'$'
 
 PUBLIC file_buf
