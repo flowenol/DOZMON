@@ -6,6 +6,12 @@
 
 You need DOS 3.0+ environment and TASM assembler 2.0+ to compile the sources.
 
+## Options
+
+- `/h` - display help
+- `/p` - enable paging
+- `/c` - clear screen
+
 ## Usage
 
 Read single memory address at $FFFFF:
