@@ -20,12 +20,15 @@ fcb ENDS
 file          fcb <>             ; file structure
 file_buf      DB WR_BUF_SIZE DUP(0)
 
+file_mem_buf  DW 00h
+
 fname_buf     DB 12 DUP(0)
 
 file_str      DB CR,LF,"enter file name: ",'$'
 file_size_str DB CR,LF,"file size: ",'$'
 
 PUBLIC file_buf
+PUBLIC file_mem_buf
 
 .CODE
 
@@ -151,13 +154,18 @@ ENDP
 
 ; Writes si bytes in file_buf to file. Z=0 if error.
 ;
-; destroys dx,ax,bx,cx,si
+; destroys dx,ax,bx,cx,si,di
 write_to_file PROC NEAR
-   mov dx,OFFSET file_buf
-   mov ah,1ah                     ; set disk transfer area address to file_buf
+   push ds
+
+   mov ds,file_mem_buf            ; set disk transfer area to file_mem_buf
+   mov dx,0
+   mov ah,1ah
    int 21h
+
+   pop ds
    
-   cmp si,WR_BUF_SIZE-1           ; if si is equal to buffer size
+   cmp si,F_BUF_SIZE-1            ; if si is equal to buffer size
    je write_to_file2              ; then proceed with sequential write
 
    mov ax,file.file_size          ; else set random_record to file size
@@ -169,11 +177,14 @@ write_to_file PROC NEAR
 
    mov cx,si                      ; set cx to the number of bytes in buffer
    inc cx
-   mov bx,OFFSET file_buf         ; set bx to buffer offset
+   
+   push es                        ; set es segmen register to file_mem_buf
+   mov es,file_mem_buf
    xor si,si
+   xor di,di
 
 write_to_file1:
-   mov dx,OFFSET file             ; write single byte from write_nuf
+   mov dx,OFFSET file             ; write single byte from file_mem_buf
    mov ah,22h
    int 21h
    
@@ -185,13 +196,15 @@ write_to_file1:
    adc file.random_rec+2,0
    adc file.random_rec+3,0
 
-   inc si                         ; write next byte in file_buf to 1st
-   mov al,[bx + si]               ; position
-   mov file_buf,al
+   inc si                         ; write next byte in file_mem_buf to 1st
+   mov al,es:si                   ; position
+   mov es:di,al
    
    popf                           ; restore check status
 
    loope write_to_file1           ; loop while cx !=0 and Z=1
+
+   pop es
 
    retn                           ; end writing to file
 

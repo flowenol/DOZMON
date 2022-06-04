@@ -27,6 +27,13 @@ print_digit MACRO DIGIT
    int 21h
 ENDM
 
+; Resizes allocated memory to 16k
+resize_16k MACRO
+   mov ah,4ah
+   mov bx,180h                    ; 384 * 16 (paragraph size) 
+   int 21h
+ENDM
+
 ; Exit to DOS
 ; destroys ah
 exit MACRO

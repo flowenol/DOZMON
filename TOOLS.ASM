@@ -23,6 +23,7 @@ PUBLIC print_address
 PUBLIC print_hex
 PUBLIC print_at_col
 PUBLIC div_by_10
+PUBLIC alloc_mem
 
 ; Reads from standard input a string of max si 
 ; length into es:di
@@ -98,7 +99,7 @@ read:
    mov di,OFFSET allowed_chars    ; load allowed chars offset to di
    mov cx,ALLOWED_CHARS_LENGTH    ; initialize counter
 
-   mov ah,08h                     ; read char into al
+   mov ah,07h                     ; read char into al
    int 21h
 
 read_loop:
@@ -496,5 +497,25 @@ div_loop_end4:
    pop bp   
    retn
 ENDP
+
+; Allocates number of paragraphs (16 bytes) specified in bx.
+; Returns segment of allocated memory in ax. C=1, bx=max available
+; if allocation failed.
+;
+; destroys ax,may destroy bx
+alloc_mem PROC NEAR
+   mov ah,48h
+   int 21h  
+   retn
+ENDP
+
+; Frees memory at segment specified in es. C=1 if release failed.
+;
+; destroys ah
+free_mem PROC NEAR
+   mov ah,49h
+   int 21h
+   retn
+ENDP 
 
 END

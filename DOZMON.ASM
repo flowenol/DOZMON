@@ -26,6 +26,14 @@ help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
                    DB "/h - display help",CR,LF
                    DB CR,LF,'$'
 
+resize_err_string  DB CR,LF
+                   DB "memory resize error = "
+                   DB '$'
+
+f_buf_err_string   DB CR,LF
+                   DB "memory allocation error = "
+                   DB '$'
+
 file_err_string    DB CR,LF
                    DB "file access error"
                    DB '$'
@@ -45,6 +53,7 @@ GLOBAL bytes_wr:BYTE:BUFFER_MAX
 GLOBAL bytes_len:BYTE
 
 EXTRN file_buf:BYTE               ; declared in 'file' module
+EXTRN file_mem_buf:WORD           ; declared in 'file' module
 
 .CODE
 
@@ -59,8 +68,10 @@ EXTRN print_hex:NEAR              ; declared in 'tools' module
 EXTRN cls:NEAR                    ; declared in 'tools' module
 EXTRN print_address:NEAR          ; declared in 'tools' module
 EXTRN print_at_col:NEAR           ; declared in 'tools' module
+EXTRN alloc_mem:NEAR              ; declared in 'tools' module
+EXTRN free_mem:NEAR               ; declared in 'tools' module
 
-EXTRN parse_input:NEAR            ; declared in 'interpret' module
+EXTRN parse_input:NEAR            ; declared in 'interpre' module
 
 EXTRN open_file:NEAR              ; declared in 'file' module
 EXTRN create_file:NEAR            ; declared in 'file' module
@@ -68,7 +79,14 @@ EXTRN read_from_file:NEAR         ; declared in 'file' module
 EXTRN write_to_file:NEAR          ; declared in 'file' module
 EXTRN close_file:NEAR             ; declared in 'file' module
 
-start:
+main:
+
+   resize_16k
+   jnc start0
+
+   jmp resize_error
+
+start0:
    mov ax,@data
    mov ds,ax                      ; set DS to point to the data segment
    mov psp,es                     ; preserve PSP segment
@@ -88,11 +106,21 @@ start:
 start1:
    mov al,option                  ; check if clear screen option was selected
    and al,MASK clear
-   jz start2
+   jz start2                      ; proceed if no
 
    call NEAR PTR cls              ; clear screen
 
 start2:
+   mov bx,F_BUF_PARS              ; allocate memory for file ops buffer
+   call NEAR PTR alloc_mem
+   jnc start3
+
+   jmp alloc_error
+
+start3:
+   mov file_mem_buf,ax            ; save allocated file ops segment
+
+start4:
    print PROMPT
 
    mov di,OFFSET input            ; reset input buffer
@@ -105,15 +133,15 @@ read:
    pop di                         ; restore di and cl
    pop cx
 
-   cmp al,CR                      ; check if enter pressed
+   cmp al,CR                      ; check if enter was pressed
    je read_loop                   ; and skip store in es:di
 
    cmp al,BKSP                    ; check if backspace pressed
    jne store_read                 ; proceed to store if not
 
-   cmp di,0                       ; if di == 0 then we cannot delete
+   cmp di,OFFSET input            ; if di == 0 then we cannot delete
                                   ; more characters
-   je cant_del                    ; and we simply need to fix cl by 1
+   je cant_del                    ; and we need to fix cl by 1
                                   ; else we must decrement both di and cl
    print BKSP
    print SPACE
@@ -183,9 +211,9 @@ print_offset:
 
    mov al,option                  ; check if paging option was set
    and al,MASK paging
-   jz print_offset1
+   jz print_offset1               ; if paging not set then proceed
 
-   mov al,CR                      ; if yes wait for user to press CR
+   mov al,CR                      ; wait for user to press CR
    call NEAR PTR wait_for_char
    mov dh,MAX_ROWS                ; and reset the row counter to max
 
@@ -196,16 +224,16 @@ print_offset:
    call NEAR PTR cls              ; if yes clear the screen
    mov dh,MAX_ROWS                ; and reset the row counter to max
 
-   jmp print_offset2              ; skip linefeed after screen was cleared
+   jmp print_offset2              ; skip line feed after screen was cleared
 
 print_offset1:
    print CR                       ; go to new line
    print LF
 print_offset2:
-   call NEAR PTR print_address    ; print current address followed by a colon
-   print COLON
+   call NEAR PTR print_address    ; print current address in es:di
+   print COLON                    ; followed by a colon
 
-   mov cl,16                      ; print 16 bytes per line
+   mov cl,BYTES_ROW               ; print 16 bytes per line
 
 print_byte:
    print SPACE
@@ -248,10 +276,10 @@ print_end:
 ; Write action                    ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 write_action:
-   xor ch,ch
+   xor ch,ch                      ; clear the upper part of cx register
    mov cl,bytes_len               ; set cx to number of bytes to write
 
-   cmp cx,0                       ; check if any bytes to write
+   cmp cx,0                       ; check if there are any bytes to write
    jne write_action1
    jmp reset_state                ; finish early if no bytes to write
 
@@ -296,34 +324,37 @@ filew_bytes:
 
    push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
-   mov bx,OFFSET file_buf
-   jnz filew_error
    mov si,0
 
 filew_byte:
-   mov al,es:[byte ptr di]        ; load byte from es:di into file_buf
-   mov [bx + si],al
+   mov al,es:[byte ptr di]        ; load byte from es:di into file_mem_buf
+   push es
+   mov es,file_mem_buf
+   mov es:si,al
+   pop es
    
-   cmp si,WR_BUF_SIZE - 1
+   cmp si,F_BUF_SIZE-1 
    jne filew_byte1
 
+   push di
    call NEAR PTR write_to_file    ; write to file
+   pop di
    jnz filew_error
-   mov si,-1
+   mov si,-1                      ; indicate that the file buffer was flushed
 
 filew_byte1:
    mov ax,es                      
    cmp ax,end_seg                 ; check if current segment equals end_seg
-   jne filew_next_byte             ; if not proceed to next byte
+   jne filew_next_byte            ; if not proceed to next byte
 
    cmp di,end_off                 ; check if current offset equals end_off
-   jne filew_next_byte             ; if yes stop writing to file
+   jne filew_next_byte            ; if yes stop writing to file
 
-   cmp si,-1
-   je filew_close
+   cmp si,-1                      ; if the buffer was already flushed we
+   je filew_close                 ; may close the file
 
-   call NEAR PTR write_to_file    ; write to file
-   jnz filew_error
+   call NEAR PTR write_to_file    ; write the remaining bytes and close the
+   jnz filew_error                ; file
    jmp filew_close
 
 filew_next_byte:
@@ -427,7 +458,25 @@ reset_state1:
    print CR
    print LF
    print LF
-   jmp start2
+   jmp start4
+
+resize_error:
+   push ax                        ; preserve resize error code
+   mov bx,OFFSET resize_err_string ; print memory resize error message
+   print_string @data,bx
+
+   pop ax                         ; restore and print resize error code
+   print_digit al
+   jmp finish
+
+
+alloc_error:
+   push ax                        ; preserve allocation error code
+   mov bx,OFFSET f_buf_err_string ; print memory allocation error message
+   print_string @data,bx
+
+   pop ax                         ; restore and print allocation error code
+   print_digit al
 
 finish:
    exit                           ; exit to DOS
@@ -477,4 +526,4 @@ compare_failure:
 
 ENDP
 
-END start
+END main
