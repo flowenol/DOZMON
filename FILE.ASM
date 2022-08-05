@@ -132,22 +132,48 @@ create_file_end:
 ENDP
 
 ; Reads single byte from file to file_buf. Z=0 if error. 
-; al=01 if EOF.
+; al=01 or al=03 if EOF. Returns number of read_bytes in bx.
 ;
-; destroys ax,dx
+; destroys ax,dx,bx
 read_from_file PROC NEAR
-   mov dx,OFFSET file_buf
-   mov ah,1ah                     ; set disk transfer area address to file_buf
+   push ds
+
+   mov ds,file_mem_buf            ; set disk transfer area to file_mem_buf
+   mov dx,0
+   mov ah,1ah
    int 21h
 
-   mov file.rec_size,1            ; and set the record size to 1 byte
+   pop ds
+
+   mov file.rec_size,F_BUF_SIZE   ; and set the record size to F_BUF_SIZE bytes
 
    mov dx,OFFSET file             ; read from file
    mov ah,14h
    int 21h
 
+   mov bx,F_BUF_SIZE              ; set the default length of bytes read
    or al,al                       ; check status
+   pushf
+   jz read_from_file_end
 
+   cmp al,1                       ; if EOF then do nothing more
+   jz read_from_file_end
+   
+   cmp al,3                       ; if partial record read at EOF then calculate
+   jnz read_from_file_end         ; read length
+
+   push ax                        ; save al
+   mov dx,file.file_size+2        ; divide file.file_size by F_BUF_SIZE 
+   mov ax,file.file_size
+
+   mov bx,F_BUF_SIZE
+
+   div bx
+
+   mov bx,dx                      ; copy tail number of bytes to bx
+   pop ax                         ; restore al
+read_from_file_end:
+   popf
    retn
 ENDP
 

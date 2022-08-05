@@ -386,41 +386,43 @@ filew_error:
 ; File read action                ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 filer_action:
-   call compare_offsets           ; validate offsets
-   jnc filer_bytes
-
-   jmp error_action
-
-filer_bytes:
    call NEAR PTR open_file
    jnz filer_error
 
    push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
-   mov bx,OFFSET file_buf
-   jnz filer_error
 
-filer_byte:
+filer_bytes:
    call NEAR PTR read_from_file
    cmp al,1
    je filer_close
+
+   cmp al,2
+   je filer_error
    
-   or al,al
-   jnz filer_error
+   xor si,si                      ; clear the read bytes index
+   mov cx,bx                      ; copy the length of bytes read
    
-   mov al,[bx]                    ; load byte from file_buf
+filer_byte:
+   push es
+   mov es,file_mem_buf
+
+   mov al,es:[byte ptr si]        ; load byte from file_mem_buf
+   pop es
    mov es:[byte ptr di],al        ; and save at es:di
-   
-filer_next_byte:
+
    inc si
    inc di                         ; increment current offset by 1
-   jnz filer_byte
+   jnz filer_byte_end
 
    mov ax,es                      ; adjust segment if offset overflow detected
    add ax,1000h
    mov es,ax
 
-   jmp filer_byte
+filer_byte_end:
+
+   loop filer_byte             
+   jmp filer_bytes
 
 filer_close:
    call NEAR PTR close_file       ; close file after write is complete
