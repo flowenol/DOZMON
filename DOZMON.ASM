@@ -386,10 +386,10 @@ filew_error:
 ; File read action                ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 filer_action:
+   push es                        ; save original es segment value
    call NEAR PTR open_file
    jnz filer_error
 
-   push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
 
 filer_bytes:
@@ -420,7 +420,6 @@ filer_byte:
    mov es,ax
 
 filer_byte_end:
-
    loop filer_byte             
    jmp filer_bytes
 
@@ -433,6 +432,7 @@ filer_end:
    jmp reset_state
 
 filer_error:
+   pop es
    mov bx,OFFSET file_err_string  ; print file error message
    print_string @data,bx
    jmp error_action

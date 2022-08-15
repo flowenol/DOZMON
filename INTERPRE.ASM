@@ -287,11 +287,21 @@ ENDP
 ;
 ; destroys al
 char_to_hex PROC
-   cmp al,60h                     ; check if char in al is alphanumeric
+   cmp al,40h                     ; check if char in al is alphanumeric
    jl digit                       ; if not jump to digit handling
+
+   cmp al,60h                     ; check if char is lower case letter
+   jl lower_case                  ; if not jump to lower case letter handling
+
    sub al,60h                     ; subtract char before 'a'
    add al,09h                     ; add 9 to adjust value
    jmp converted
+
+lower_case:
+   sub al,40h                     ; subtract char before 'A'
+   add al,09h                     ; add 9 to adjust value
+   jmp converted
+
 digit:
    sub al,30h                     ; subtract '0' to get number
 converted:
