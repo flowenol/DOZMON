@@ -3,10 +3,22 @@ TASM_OPT = /m2 /l
 TLINK = tlink
 TLINK_OPT = /v
 
-all: compile link
+all: dozmon tools args interpre file link
 
-compile:
-        $(TASM) $(TASM_OPT) dozmon.asm+tools.asm+args.asm+interpre.asm+file.asm
+dozmon:
+        $(TASM) $(TASM_OPT) dozmon.asm
+
+tools:
+        $(TASM) $(TASM_OPT) tools.asm
+
+args:
+        $(TASM) $(TASM_OPT) args.asm
+
+interpre:
+        $(TASM) $(TASM_OPT) interpre.asm
+
+file:
+        $(TASM) $(TASM_OPT) file.asm
 
 link:
         $(TLINK) $(TLINK_OPT) dozmon.obj+tools.obj+args.obj+interpre.obj+file.obj,dozmon.exe,dozmon.map

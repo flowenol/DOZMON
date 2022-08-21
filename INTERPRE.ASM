@@ -60,6 +60,12 @@ parse_input PROC NEAR
    jmp quit_mode                  ; else quit mode is determined
 
 parse_input1:
+   cmp al,MEMORY                  ; check if char is M
+   jne parse_input2               ; if not proceed with parsing
+
+   jmp memory_mode                ; else memory mode is determined
+   
+parse_input2:
    cmp cl,0                       ; if input size is not equal 0 then try
    jne determine_mode             ; to determine mode
 
@@ -255,6 +261,13 @@ write_end:
    jmp all_parsed
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Memory mode                     ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+memory_mode:
+   mov mode,MODE_MEMORY
+   retn
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Quit mode                       ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 quit_mode:
@@ -324,6 +337,8 @@ hex_char PROC
    cmp al,BKSP
    je hex_char_end
    cmp al,SPACE
+   je hex_char_end
+   cmp al,MEMORY
    je hex_char_end
    cmp al,QUIT
 hex_char_end:

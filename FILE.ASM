@@ -18,16 +18,14 @@ random_rec    DW 2 DUP(0)
 fcb ENDS
 
 file          fcb <>             ; file structure
-file_buf      DB WR_BUF_SIZE DUP(0)
 
-file_mem_buf  DW 00h
+file_mem_buf  DW 00h             ; file buffer segment address
 
-fname_buf     DB 12 DUP(0)
+fname_buf     DB 12 DUP(0)       ; file name buffer
 
 file_str      DB CR,LF,"enter file name: ",'$'
 file_size_str DB CR,LF,"file size: ",'$'
 
-PUBLIC file_buf
 PUBLIC file_mem_buf
 
 .CODE
@@ -131,7 +129,7 @@ create_file_end:
    retn
 ENDP
 
-; Reads single byte from file to file_buf. Z=0 if error. 
+; Reads single byte from file to file_mem_buf. Z=0 if error. 
 ; al=01 or al=03 if EOF. Returns number of read_bytes in bx.
 ;
 ; destroys ax,dx,bx
@@ -178,7 +176,7 @@ read_from_file_end:
 ENDP
 
 
-; Writes si bytes in file_buf to file. Z=0 if error.
+; Writes si bytes in file_mem_buf to file. Z=0 if error.
 ;
 ; destroys dx,ax,bx,cx,si,di
 write_to_file PROC NEAR

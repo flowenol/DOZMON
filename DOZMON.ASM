@@ -26,6 +26,22 @@ help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
                    DB "/h - display help",CR,LF
                    DB CR,LF,'$'
 
+memory_string1     DB CR,LF
+                   DB "program start addr     = 0x"
+                   DB '$'
+
+memory_string2     DB CR,LF
+                   DB "program end addr       = 0x"
+                   DB '$'
+
+memory_string3     DB CR,LF
+                   DB "file buffer start addr = 0x"
+                   DB '$'
+
+memory_string4     DB CR,LF
+                   DB "file buffer end addr   = 0x"
+                   DB '$'
+
 resize_err_string  DB CR,LF
                    DB "memory resize error = "
                    DB '$'
@@ -39,6 +55,7 @@ file_err_string    DB CR,LF
                    DB '$'
 
 EXTRN option:options              ; declared in 'args' module
+EXTRN ssp:WORD                    ; declared in 'args' module
 EXTRN psp:WORD                    ; declared in 'args' module
 
 GLOBAL input:BYTE:BUFFER_MAX
@@ -52,7 +69,6 @@ GLOBAL mode:BYTE
 GLOBAL bytes_wr:BYTE:BUFFER_MAX
 GLOBAL bytes_len:BYTE
 
-EXTRN file_buf:BYTE               ; declared in 'file' module
 EXTRN file_mem_buf:WORD           ; declared in 'file' module
 
 .CODE
@@ -81,7 +97,7 @@ EXTRN close_file:NEAR             ; declared in 'file' module
 
 main:
 
-   resize_16k
+   resize_4k
    jnc start0
 
    jmp resize_error
@@ -89,6 +105,7 @@ main:
 start0:
    mov ax,@data
    mov ds,ax                      ; set DS to point to the data segment
+   mov ssp,sp                     ; preserve initial stack offset
    mov psp,es                     ; preserve PSP segment
    mov es,ax                      ; set ES to point to the data segment 
 
@@ -187,6 +204,7 @@ action_table:
    DW OFFSET write_action
    DW OFFSET filew_action
    DW OFFSET filer_action
+   DW OFFSET memory_action
    DW OFFSET error_action
    DW OFFSET finish
 
@@ -436,6 +454,50 @@ filer_error:
    mov bx,OFFSET file_err_string  ; print file error message
    print_string @data,bx
    jmp error_action
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Memory action                   ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+memory_action:
+   push es
+
+   mov bx,OFFSET memory_string1   ; print program start addr
+   print_string @data,bx
+
+   xor di,di
+   mov es,psp
+   call NEAR PTR print_address
+   print 'h'
+
+   mov bx,OFFSET memory_string2   ; print program end addr
+   print_string @data,bx
+
+   mov di,ssp
+   mov ax,ss
+   mov es,ax
+   call NEAR PTR print_address
+   print 'h'
+
+   mov bx,OFFSET memory_string3   ; print file buffer start addr
+   print_string @data,bx
+
+   xor di,di
+   mov ax,file_mem_buf
+   mov es,ax
+   call NEAR PTR print_address
+   print 'h'
+
+   mov bx,OFFSET memory_string4   ; print file buffer end addr
+   print_string @data,bx
+
+   mov di,F_BUF_SIZE - 1
+   mov ax,file_mem_buf
+   mov es,ax
+   call NEAR PTR print_address 
+   print 'h'
+
+   pop es
+   jmp reset_state
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

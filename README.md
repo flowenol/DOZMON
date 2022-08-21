@@ -45,4 +45,13 @@ enter file name: memory.bin
 file size: 65536
 ```
 
+Show memory allocated by program:
+```
+\M
+program start addr     = 0x15360h
+program end addr       = 0x16360h
+file buffer start addr = 0x16370h
+file buffer end addr   = 0x1656fh
+```
+
 To quit program type `Q` or `Ctrl-C`

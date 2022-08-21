@@ -6,6 +6,7 @@ INCLUDE const.inc
 allowed_chars DB '0123456789'
               DB 'abcdef'
               DB 'ABCDEF'
+              DB MEMORY
               DB QUIT
               DB CR,BKSP,SPACE
               DB DOT,COLON,CHEVRONL,CHEVRONR
