@@ -1,6 +1,6 @@
 # DOZMON 
 
-**DOZMON** is an obsolete DOS memory monitor loosely based on a famous Apple-1 and Apple ][ monitor programs. It uses very similar syntax and offers additional bidirectional file-memory transfer functionality. The source is MASM compatible.
+**DOZMON** is an obsolete DOS memory monitor loosely based on the famous Apple-1 and Apple ][ monitor programs. It uses very similar syntax and offers additional bidirectional file-memory transfer functionality. The source is MASM compatible.
 
 ## Requirements
 
