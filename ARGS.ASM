@@ -11,11 +11,9 @@ OPTION_PAGING  EQU 'p'
 OPTION_HELP    EQU 'h'
 
 option options <0,0>
-ssp DW ?
 psp DW ?
 
 PUBLIC option
-PUBLIC ssp
 PUBLIC psp
 
 .CODE

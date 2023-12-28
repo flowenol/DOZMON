@@ -49,9 +49,11 @@ Show memory allocated by program:
 ```
 \M
 program start addr     = 0x15360h
-program end addr       = 0x16360h
+program end addr       = 0x1635fh
 file buffer start addr = 0x16370h
 file buffer end addr   = 0x1656fh
+stack end addr         = 0x16360h
+stack start addr       = 0x16560h
 ```
 
 To quit program type `Q` or `Ctrl-C`

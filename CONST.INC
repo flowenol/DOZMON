@@ -1,3 +1,5 @@
+STACK_SIZE   EQU 200h
+
 CR           EQU 0dh
 LF           EQU 0ah
 BKSP         EQU 08h
@@ -9,6 +11,7 @@ MEMORY       EQU 'M'
 QUIT         EQU 'Q'
 CHEVRONL     EQU '<'
 CHEVRONR     EQU '>'
+EXCL         EQU '!'
 
 
 BUFFER_MAX   EQU 128

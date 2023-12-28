@@ -1,9 +1,10 @@
+INCLUDE const.inc
+
+
 DOSSEG
 .MODEL SMALL
-.STACK 200h
+.STACK STACK_SIZE
 .DATA
-
-INCLUDE const.inc
 
 input              DB BUFFER_MAX DUP(0)
 input_size         DB 0
@@ -42,6 +43,14 @@ memory_string4     DB CR,LF
                    DB "file buffer end addr   = 0x"
                    DB '$'
 
+memory_string5     DB CR,LF
+                   DB "stack start addr       = 0x"
+                   DB '$'
+
+memory_string6     DB CR,LF
+                   DB "stack end addr         = 0x"
+                   DB '$'
+
 resize_err_string  DB CR,LF
                    DB "memory resize error = "
                    DB '$'
@@ -55,7 +64,6 @@ file_err_string    DB CR,LF
                    DB '$'
 
 EXTRN option:options              ; declared in 'args' module
-EXTRN ssp:WORD                    ; declared in 'args' module
 EXTRN psp:WORD                    ; declared in 'args' module
 
 GLOBAL input:BYTE:BUFFER_MAX
@@ -105,7 +113,6 @@ main:
 start0:
    mov ax,@data
    mov ds,ax                      ; set DS to point to the data segment
-   mov ssp,sp                     ; preserve initial stack offset
    mov psp,es                     ; preserve PSP segment
    mov es,ax                      ; set ES to point to the data segment 
 
@@ -472,8 +479,9 @@ memory_action:
    mov bx,OFFSET memory_string2   ; print program end addr
    print_string @data,bx
 
-   mov di,ssp
+   mov di,0fh
    mov ax,ss
+   dec ax
    mov es,ax
    call NEAR PTR print_address
    print 'h'
@@ -494,6 +502,24 @@ memory_action:
    mov ax,file_mem_buf
    mov es,ax
    call NEAR PTR print_address 
+   print 'h'
+
+   mov bx,OFFSET memory_string6   ; print stack end addr
+   print_string @data,bx
+
+   xor di,di
+   mov ax,ss
+   mov es,ax
+   call NEAR PTR print_address
+   print 'h'
+
+   mov bx,OFFSET memory_string5   ; print stack start addr
+   print_string @data,bx
+
+   mov di,STACK_SIZE-1
+   mov ax,ss
+   mov es,ax
+   call NEAR PTR print_address
    print 'h'
 
    pop es
