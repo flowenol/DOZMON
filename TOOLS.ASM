@@ -23,6 +23,7 @@ PUBLIC read_char
 PUBLIC print_number
 PUBLIC cls
 PUBLIC print_address
+PUBLIC print_io_address
 PUBLIC print_hex
 PUBLIC print_at_col
 PUBLIC div_by_10
@@ -220,6 +221,20 @@ print_nibbles:
 
    add sp,3                       ; restore original stack frame
    pop bp
+   retn
+ENDP
+
+; Prints 16 bit IO address stored in ax
+print_io_address PROC NEAR
+   push cx
+ 
+   mov cx,ax
+   mov al,ch
+   call print_hex
+   mov al,cl
+   call print_hex  
+
+   pop cx
    retn
 ENDP
 

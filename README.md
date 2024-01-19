@@ -1,6 +1,6 @@
-# DOZMON 
+# DOZMON
 
-**DOZMON** is an obsolete DOS memory monitor loosely based on the famous Apple-1 and Apple ][ monitor programs. It uses very similar syntax and offers additional bidirectional file-memory transfer functionality. The source is MASM compatible.
+**DOZMON** is an obsolete DOS memory monitor loosely based on the famous Apple-1 and Apple ][ monitor programs. It uses very similar syntax and offers additional bidirectional file-memory transfer functionality. It also allows to read and write IO port addresses. The source is MASM compatible.
 
 ## Requirements
 
@@ -15,7 +15,7 @@ You need DOS 3.0+ environment and TASM assembler 2.0+ to compile the sources.
 ## Usage
 
 Read single memory address at $FFFFF:
- 
+
 ```
 \FFFFF
 FFFFF: 00                                                   .
@@ -43,6 +43,17 @@ Write file contents into memory starting at address $00000:
 \<00000
 enter file name: memory.bin
 file size: 65536
+```
+
+Write byte to IO port at address $70:
+```
+\!70: 04
+```
+
+Read bytes from IO port at address $71:
+```
+\!71
+0071: 23 23
 ```
 
 Show memory allocated by program:

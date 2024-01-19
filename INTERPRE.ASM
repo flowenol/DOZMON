@@ -17,6 +17,7 @@ EXTRN bytes_len:BYTE
 file_flg    DB 0                  ; indicates that operation involves file
 byte_wr     DB 0                  ; current parsed byte in write mode
 byte_flg    DB 0                  ; byte boudary flag in write mode
+io_flg      DB 0                  ; indicates that operation involves io
 
 .CODE
 
@@ -88,9 +89,18 @@ determine_file:
 
 determine_file1:
    cmp al,CHEVRONL                ; else check if operation involves file
-   jne determine_mode1            ; if not proceed
+   jne determine_io               ; if not proceed
    
    mov file_flg,2                 ; else set file flag
+   loop determine_mode            ; and get next byte
+
+   jmp error_mode                 ; if no byte then error mode is determined
+
+determine_io:
+   cmp al,EXCL                    ; else check if operation involves io
+   jne determine_mode1            ; if not proceed
+
+   mov io_flg,1                   ; else set io flag
    loop determine_mode            ; and get next byte
 
    jmp error_mode                 ; if no byte then error mode is determined
@@ -135,7 +145,12 @@ determine_mode3:
 read_mode:
    dec cx                         ; decrement cx in case the mode was
                                   ; determined with DOT
-   jcxz read_end
+   jcxz read_end                  ; if not go to read_end
+
+   cmp io_flg,0                   ; else check if io_flag was set
+
+   je read_mode1                  ; proceed if not set
+   jmp error_mode                 ; else finish with error (no end offset)
 
 read_mode1:
    lodsb                          ; read next char into al
@@ -159,21 +174,27 @@ read_mode2:
 
 read_end:
    cmp file_flg,0                 ; check if file operation flag was not set
-   je read_end2                   ; if not proceed 
+   je read_end1                   ; if not proceed 
 
    cmp file_flg,1                 ; check if file_flag was set with proper char
-   jne read_end1                  ; if not then error
+   jne read_end3                  ; if not then error
 
    mov mode,MODE_FILEW            ; else determine write memory to file mode
    jmp all_parsed                 ; and finish
 
 read_end1:
-   jmp error_mode
+   cmp io_flg,1                   ; check if io operation flag was set
+   jne read_end2                  ; if not proceed
+
+   mov mode,MODE_IOR              ; else determine io read mode
+   jmp all_parsed                 ; and finish
 
 read_end2:
    mov mode,MODE_READ             ; determine plain read mode
    jmp all_parsed                 ; and finish
 
+read_end3:
+   jmp error_mode
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Write mode                      ;
@@ -181,9 +202,17 @@ read_end2:
 write_mode:
    dec cx                         ; decrement cx due to detected colon char
 
-   cmp file_flg,0
-   je write_mode1
+   cmp file_flg,0                 ; check if file operation flag was set
+   jne write_mode_file            ; if yes go to write_mode_file
 
+   cmp io_flg,0                   ; else check if io operation flag was set
+   je write_mode1                 ; if no determine normal write mode
+                                  ; and proceed
+
+   mov mode,MODE_IOW              ; else determine io write mode
+   jmp write_mode11               ; and proceed
+
+write_mode_file:
    cmp file_flg,2                 ; check if proper file operation flag was set
    jne write_mode_err             ; error if not
 
@@ -199,6 +228,7 @@ write_mode_err:
 
 write_mode1:
    mov mode,MODE_WRITE            ; determine the mode to MODE_WRITE
+write_mode11:
    mov byte_wr,0                  ; clear actual byte variable
    mov byte_flg,0                 ; clear byte boundary detection flag
 
@@ -288,6 +318,7 @@ all_parsed:
    mov file_flg,0                 ; clear helper variables
    mov byte_wr,0
    mov byte_flg,0
+   mov io_flg,0
 
    mov cl,12                      ; adjust segment variables by shifting
    shl start_seg,cl               ; 12 positions left

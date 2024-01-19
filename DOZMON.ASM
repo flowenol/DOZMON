@@ -91,6 +91,7 @@ EXTRN print_number:NEAR           ; declared in 'tools' module
 EXTRN print_hex:NEAR              ; declared in 'tools' module
 EXTRN cls:NEAR                    ; declared in 'tools' module
 EXTRN print_address:NEAR          ; declared in 'tools' module
+EXTRN print_io_address:NEAR       ; declared in 'tools' module
 EXTRN print_at_col:NEAR           ; declared in 'tools' module
 EXTRN alloc_mem:NEAR              ; declared in 'tools' module
 EXTRN free_mem:NEAR               ; declared in 'tools' module
@@ -211,6 +212,8 @@ action_table:
    DW OFFSET write_action
    DW OFFSET filew_action
    DW OFFSET filer_action
+   DW OFFSET ior_action
+   DW OFFSET iow_action
    DW OFFSET memory_action
    DW OFFSET error_action
    DW OFFSET finish
@@ -460,6 +463,63 @@ filer_error:
    pop es
    mov bx,OFFSET file_err_string  ; print file error message
    print_string @data,bx
+   jmp error_action
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; IO Read action                  ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+ior_action:
+   print CR                       ; print new line
+   print LF
+
+   mov ax,start_off               ; move start_off to ax
+   call NEAR PTR print_io_address ; print IO port address
+
+   print COLON                    
+   print SPACE
+
+   mov dx,start_off               ; move start_off to dx
+   in ax,dx                       ; read IO port address data to ax
+   
+   mov cl,ah
+   call NEAR PTR print_hex        ; print lower byte
+   
+   print SPACE
+
+   mov al,cl                      ; print upper byte
+   call NEAR PTR print_hex
+   
+   jmp reset_state                
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; IO Write action                 ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+iow_action:
+   mov bl,bytes_len               ; check how many input bytes were writteb
+
+   cmp bl,2                       ; if more than two or zero then error
+   jg iow_error
+
+   cmp bl,0                         
+   je iow_error
+
+   mov dx,start_off               ; else move IO port address to dx
+   
+   mov al,bytes_wr                ; and first written byte to al 
+
+   cmp bl,2                       ; if more than 1 byte written
+   je iow_word                    ; jump to word write to IO port address
+   
+iow_byte:
+   out dx,al                      ; else write just a single byte
+   jmp iow_end
+iow_word:
+   mov ah,[byte ptr bytes_wr+1]   ; mov the second written byte to ah
+   out dx,ax                      ; and write the word in ax to IO port address
+
+iow_end:
+   jmp reset_state
+iow_error:
    jmp error_action
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
