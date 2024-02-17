@@ -74,7 +74,7 @@ open_file PROC NEAR
    jnz open_file_end              ; terminate prematurely on error
    pushf                          ; preserve status
 
-   mov bx,OFFSET file_size_str    ; print file size
+   mov bx,OFFSET file_size_str    ; print file size string
    print_string @data,bx
 
    sub sp,4                       
@@ -83,9 +83,10 @@ open_file PROC NEAR
    mov ax,file.file_size          ; copy file size to stack parameter for
    mov word ptr ss:[bx],ax        ; print number
    mov ax,file.file_size + 2
-   mov word ptr ss:[bx + 2],ax
+   mov word ptr ss:[bx+2],ax
 
-   call NEAR PTR print_number
+   call NEAR PTR print_number     ; print size number
+
    add sp,4                       ; restore stack
 
    popf                           ; restore status
@@ -98,10 +99,10 @@ ENDP
 ; 
 ; destroys ax,dx,cx,si,di
 create_file PROC NEAR
-   mov bx,OFFSET file_str
+   mov bx,OFFSET file_str         ; print file name string
    print_string @data,bx
 
-   mov ax,SEG fname_buf
+   mov ax,SEG fname_buf           ; read file name string
    mov es,ax
    mov di,OFFSET fname_buf
    mov si,12
@@ -202,8 +203,8 @@ write_to_file PROC NEAR
    mov cx,si                      ; set cx to the number of bytes in buffer
    inc cx
    
-   push es                        ; set es segmen register to file_mem_buf
-   mov es,file_mem_buf
+   push es                        ; preserve es segment register
+   mov es,file_mem_buf            ; set es segment register to file_mem_buf
    xor si,si
    xor di,di
 
@@ -215,6 +216,7 @@ write_to_file1:
    or al,al                       ; check and preserve status
    pushf
 
+   clc
    add file.random_rec,1          ; increment random_record
    adc file.random_rec+1,0
    adc file.random_rec+2,0
@@ -228,7 +230,7 @@ write_to_file1:
 
    loope write_to_file1           ; loop while cx !=0 and Z=1
 
-   pop es
+   pop es                         ; restore es segment register
 
    retn                           ; end writing to file
 

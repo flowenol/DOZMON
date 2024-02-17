@@ -28,6 +28,7 @@ PUBLIC print_hex
 PUBLIC print_at_col
 PUBLIC div_by_10
 PUBLIC alloc_mem
+PUBLIC free_mem
 
 ; Reads from standard input a string of max si 
 ; length into es:di

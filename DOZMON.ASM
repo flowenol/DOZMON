@@ -28,28 +28,37 @@ help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
                    DB CR,LF,'$'
 
 memory_string1     DB CR,LF
-                   DB "program start addr     = 0x"
+                   DB "program start addr              = 0x"
                    DB '$'
 
 memory_string2     DB CR,LF
-                   DB "program end addr       = 0x"
+                   DB "program end addr                = 0x"
                    DB '$'
 
 memory_string3     DB CR,LF
-                   DB "file buffer start addr = 0x"
+                   DB "file buffer start addr          = 0x"
                    DB '$'
 
 memory_string4     DB CR,LF
-                   DB "file buffer end addr   = 0x"
+                   DB "file buffer end addr            = 0x"
                    DB '$'
 
 memory_string5     DB CR,LF
-                   DB "stack start addr       = 0x"
+                   DB "stack start addr                = 0x"
                    DB '$'
 
 memory_string6     DB CR,LF
-                   DB "stack end addr         = 0x"
+                   DB "stack end addr                  = 0x"
                    DB '$'
+
+memory_string7     DB CR,LF
+                   DB "additional mem start addr       = 0x"
+                   DB '$'
+
+memory_string8     DB CR,LF
+                   DB "additional mem end addr         = 0x"
+                   DB '$'
+
 
 resize_err_string  DB CR,LF
                    DB "memory resize error = "
@@ -79,6 +88,9 @@ GLOBAL bytes_len:BYTE
 
 EXTRN file_mem_buf:WORD           ; declared in 'file' module
 
+
+additional_mem_buf DW 0           ; additional "playground" memory
+
 .CODE
 
 INCLUDE macros.inc 
@@ -106,7 +118,7 @@ EXTRN close_file:NEAR             ; declared in 'file' module
 
 main:
 
-   resize_4k
+   resize_8k
    jnc start0
 
    jmp resize_error
@@ -144,6 +156,16 @@ start2:
 
 start3:
    mov file_mem_buf,ax            ; save allocated file ops segment
+
+start31:
+   mov bx,ADD_BUF_PARS            ; allocate memory for additional buffer
+   call NEAR PTR alloc_mem
+   jnc start32
+
+   jmp alloc_error
+
+start32:
+   mov additional_mem_buf,ax      ; save allocated additional mem segment
 
 start4:
    print PROMPT
@@ -347,10 +369,10 @@ filew_action:
    jmp error_action
 
 filew_bytes:
+   push es                        ; save original es segment value
    call NEAR PTR create_file
    jnz filew_error
 
-   push es                        ; save original es segment value
    les di,[dword ptr start_off]   ; load start_off value into es:di 
    mov si,0
 
@@ -405,6 +427,7 @@ filew_end:
    jmp reset_state
 
 filew_error:
+   pop es
    mov bx,OFFSET file_err_string  ; print file error message
    print_string @data,bx
    jmp error_action
@@ -582,6 +605,22 @@ memory_action:
    call NEAR PTR print_address
    print 'h'
 
+   mov bx,OFFSET memory_string7
+   print_string @data,bx
+
+   xor di,di
+   mov es,additional_mem_buf
+   call NEAR PTR print_address
+   print 'h'
+
+   mov bx,OFFSET memory_string8
+   print_string @data,bx
+
+   mov di,ADD_BUF_SIZE-1
+   mov es,additional_mem_buf
+   call NEAR PTR print_address
+   print 'h'
+
    pop es
    jmp reset_state
 
@@ -629,6 +668,10 @@ alloc_error:
    print_digit al
 
 finish:
+   mov es,file_mem_buf
+   call NEAR PTR free_mem
+   mov es,additional_mem_buf
+   call NEAR PTR free_mem
    exit                           ; exit to DOS
 
 

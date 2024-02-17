@@ -28,9 +28,9 @@ print_digit MACRO DIGIT
 ENDM
 
 ; Resizes allocated memory to 4k
-resize_4k MACRO
+resize_8k MACRO
    mov ah,4ah
-   mov bx,100h                    ; 256 * 16 (paragraph size) 
+   mov bx,200h                    ; 512 * 16 (paragraph size) 
    int 21h
 ENDM
 
