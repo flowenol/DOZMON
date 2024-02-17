@@ -19,7 +19,7 @@ bytes_len          DB 0
 
 END_OF_STATE       EQU ($ - input)
 
-help_string        DB CR,LF,"DOZMON ver 0.1 by flowenol",CR,LF
+help_string        DB CR,LF,"DOZMON ver 0.2 by flowenol",CR,LF
                    DB CR,LF
                    DB "Options:",CR,LF
                    DB "/c - enable clear screen",CR,LF
