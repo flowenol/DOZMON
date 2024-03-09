@@ -35,5 +35,5 @@ F_BUF_PARS   EQU 32
 ADD_BUF_SIZE EQU 65536
 ADD_BUF_PARS EQU 4096
 
-options RECORD clear:1,paging:1,help:1
+options RECORD clear:1,paging:1,addmem:1,help:1,invalid:1
 

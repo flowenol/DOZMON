@@ -27,6 +27,18 @@ print_digit MACRO DIGIT
    int 21h
 ENDM
 
+shiftr MACRO REG,NUM
+REPT NUM
+   shr REG,1
+ENDM
+ENDM
+
+shiftl MACRO REG,NUM
+REPT NUM
+   shl REG,1
+ENDM
+ENDM
+
 ; Resizes allocated memory to 4k
 resize_8k MACRO
    mov ah,4ah

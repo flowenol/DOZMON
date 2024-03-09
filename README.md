@@ -11,6 +11,7 @@ You need DOS 3.0+ environment and TASM assembler 2.0+ to compile the sources.
 - `/h` - display help
 - `/p` - enable paging
 - `/c` - clear screen
+- `/a <num>` - reserve additional memory buffer wit `num` pages size (16b page)
 
 ## Usage
 
@@ -56,15 +57,17 @@ Read bytes from IO port at address $71:
 0071: 23 23
 ```
 
-Show memory allocated by program:
+Show memory allocated by program by typin `M`:
 ```
 \M
-program start addr     = 0x15360h
-program end addr       = 0x1635fh
-file buffer start addr = 0x16370h
-file buffer end addr   = 0x1656fh
-stack end addr         = 0x16360h
-stack start addr       = 0x16560h
+program start addr              = 0x15360h
+program end addr                = 0x1635fh
+file buffer start addr          = 0x16370h
+file buffer end addr            = 0x1656fh
+stack end addr                  = 0x16360h
+stack start addr                = 0x16560h
+additional mem start addr       = 0x17560h
+additional mem end addr         = 0x17570h
 ```
 
 To quit program type `Q` or `Ctrl-C`

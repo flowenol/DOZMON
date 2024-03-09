@@ -21,6 +21,9 @@ PUBLIC read_str
 PUBLIC wait_for_char
 PUBLIC read_char
 PUBLIC print_number
+PUBLIC print_number_hex
+PUBLIC add_32bit
+PUBLIC subtract_32bit
 PUBLIC cls
 PUBLIC print_address
 PUBLIC print_io_address
@@ -119,7 +122,7 @@ found:
    retn
 ENDP
 
-; Prints unsigned 32 bit integer number 
+; Prints in decimal unsigned 32 bit integer number 
 ; from bytes on stack
 ;
 ; destroys: ax, bx, cx, dx, si
@@ -132,7 +135,7 @@ print_number PROC NEAR
    
    sub sp,5                       ; reserve 5 bytes on stack for number and
    mov bx,sp                      ; remainder
-   mov ax,[bp + 4]                ; copy argument for dicision
+   mov ax,[bp + 4]                ; copy argument for division
    mov word ptr ss:[bx + 1],ax
    mov ax,[bp + 6]
    mov word ptr ss:[bx + 3],ax
@@ -156,6 +159,110 @@ calc_digit:
 
    add sp,5                       ; restore stack: 5 bytes for quotient and r
    add sp,11                      ; restore stack: 11 bytes for number string
+   pop bp
+   retn
+ENDP
+
+; Prints unsigned 32 bit number in hex
+; skipping leading zeros
+print_number_hex PROC NEAR a:DWORD
+LOCAL print_zeros:byte
+   push bp
+   mov bp,sp
+   push ax
+   push bx
+   push cx
+
+   mov print_zeros,0              ; clear print leading zeros flag
+
+   mov cx,4                       ; set four nibbles
+   mov bx,word ptr[a+2]           ; load upper word
+
+print_number_hex_upper:
+   mov ax,bx                      ; get highest nibble
+   and ax,0F000h
+   shiftr ax,12                   ; shift to al
+
+   or print_zeros,al              ; check if leading zero
+   jz print_number_hex_upper_next ; and skip if true
+   
+   call NEAR PTR print_nibble     ; print nibble
+
+print_number_hex_upper_next:   
+   shiftl bx,4                    ; proceed with next nibble
+
+   loop print_number_hex_upper
+
+   mov cx,4                       ; set four nibbles
+   mov bx,word ptr[a]             ; load lower word
+
+print_number_hex_lower:
+   mov ax,bx
+   and ax,0F000h
+   shiftr ax,12
+
+   or print_zeros,al              ; check if leading zero
+   jz print_number_hex_lower_next ; and skip if true
+
+   call NEAR PTR print_nibble
+   
+print_number_hex_lower_next:
+   shiftl bx,4                    ; proceed with next nibble
+
+   loop print_number_hex_lower
+
+   pop cx                         ; restore registers
+   pop bx
+   pop ax
+   pop bp
+   retn
+ENDP
+
+; Adds two 32 bit numbers passed on stack.
+; Returns result also on stack
+add_32bit PROC NEAR a:DWORD, b:DWORD RETURNS c:DWORD
+   push bp
+   mov bp,sp
+   push ax                        ; preseve ax,bx
+   push bx
+
+   clc                            
+   mov ax,word ptr [a]            
+   mov bx,word ptr [a+2]
+   
+   add ax,word ptr [b]           ; add lower bytes of args
+   adc bx,word ptr [b+2]         ; add with carry higher bytes of args
+
+   mov word ptr [c],ax           ; save result on stack
+   mov word ptr [c+2],bx
+
+   pop bx                        ; restore ax,bx
+   pop ax
+   pop bp
+   retn
+ENDP
+
+; Subtracts two 32 bit number from stack and
+; leaves result on stack. Calculates a - b.
+; First argument is on the bottom of stack.
+subtract_32bit PROC NEAR a:DWORD,b:DWORD RETURNS c:DWORD
+   push bp
+   mov bp,sp
+   push ax
+   push bx
+
+   clc
+   mov ax,word ptr [a]           ; load a argument lower byte 
+   mov bx,word ptr [a+2]         ; load a argument upper byte
+   
+   sub ax,word ptr [b]           ; subtract lower bytes of args
+   sbb bx,word ptr [b+2]         ; subtract with borrow higher bytes of args
+
+   mov word ptr [c],ax           ; save result on stack
+   mov word ptr [c+2],bx
+
+   pop bx                        ; restores ax,bx
+   pop ax
    pop bp
    retn
 ENDP
@@ -241,16 +348,17 @@ ENDP
 
 ; Prints byte in al
 ;
-; destroys bx
 print_hex PROC NEAR
    push cx                        ; preserve cx
    push ax                        ; preserve ax
+   push bx                        ; preserve bx
    mov cl,4                       
    shr al,cl                      ; shr 4 times to get high nibble
    call print_nibble              ; print high nibble
    mov bx,sp
-   mov ax,ss:[bx]                 ; restore ax without popping from stack
+   mov ax,ss:[bx+2]               ; restore ax without popping from stack
    call print_nibble              ; print low nibble
+   pop bx                         ; restore bx
    pop ax                         ; restore ax
    pop cx                         ; restore cx
    retn
@@ -308,7 +416,7 @@ ENDP
 ; Prints lower nibble in al
 ;
 ; destroys al
-print_nibble PROC
+print_nibble PROC NEAR
    and al,0Fh
    cmp al,9
    jg hex_nibble
@@ -319,7 +427,7 @@ print_nibble PROC
 hex_nibble:
    add al,57h
    print al
-   ret
+   retn
 ENDP
 
 div_by_10 PROC NEAR

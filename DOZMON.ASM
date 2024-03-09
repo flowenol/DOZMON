@@ -19,11 +19,14 @@ bytes_len          DB 0
 
 END_OF_STATE       EQU ($ - input)
 
+parse_err_string   DB CR,LF,"wrong arguments",CR,LF,CR,LF,'$'
+
 help_string        DB CR,LF,"DOZMON ver 0.2 by flowenol",CR,LF
                    DB CR,LF
-                   DB "Options:",CR,LF
+help_string_opt    DB "Options:",CR,LF
                    DB "/c - enable clear screen",CR,LF
                    DB "/p - enable paging",CR,LF
+                   DB "/a <number> - no of 16b pars for additional mem",CR,LF 
                    DB "/h - display help",CR,LF
                    DB CR,LF,'$'
 
@@ -74,6 +77,7 @@ file_err_string    DB CR,LF
 
 EXTRN option:options              ; declared in 'args' module
 EXTRN psp:WORD                    ; declared in 'args' module
+EXTRN addmem_pgs:WORD             ; declared in 'args' module
 
 GLOBAL input:BYTE:BUFFER_MAX
 GLOBAL input_size:BYTE
@@ -100,6 +104,9 @@ EXTRN parse_args:NEAR             ; declared in 'args' module
 EXTRN wait_for_char:NEAR          ; declared in 'tools' module
 EXTRN read_char:NEAR              ; declared in 'tools' module
 EXTRN print_number:NEAR           ; declared in 'tools' module
+EXTRN print_number_hex:NEAR       ; declared in 'tools' module
+EXTRN add_32bit:NEAR              ; declared in 'tools' module
+EXTRN subtract_32bit:NEAR         ; declared in 'tools' module
 EXTRN print_hex:NEAR              ; declared in 'tools' module
 EXTRN cls:NEAR                    ; declared in 'tools' module
 EXTRN print_address:NEAR          ; declared in 'tools' module
@@ -118,7 +125,7 @@ EXTRN close_file:NEAR             ; declared in 'file' module
 
 main:
 
-   resize_8k
+   resize_8k                      ; resize program allocated memory to 8K
    jnc start0
 
    jmp resize_error
@@ -131,14 +138,27 @@ start0:
 
    call NEAR PTR parse_args       ; parse program arguments
 
+   mov al,option                  ; check if options were parsed successfully
+   and al,MASK invalid
+   jz start00                     ; and proceed
+
+   mov bx,OFFSET parse_err_string ; else print argument error msg
+   print_string @data,bx
+
+   mov bx,OFFSET help_string_opt  ; and print options and finish
+   jmp start_help 
+
+start00:
    mov al,option                  ; check if help option was selected
    and al,MASK help
    jz start1                      ; proceed if no
 
-   mov bx,OFFSET help_string      ; if yes then print help
+   mov bx,OFFSET help_string      ; print help
+
+start_help:
    print_string @data,bx
 
-   jmp finish                     ; end program if help option was selected
+   jmp finish                     ; end program
 
 start1:
    mov al,option                  ; check if clear screen option was selected
@@ -158,7 +178,13 @@ start3:
    mov file_mem_buf,ax            ; save allocated file ops segment
 
 start31:
-   mov bx,ADD_BUF_PARS            ; allocate memory for additional buffer
+   mov al,option                  ; check if addmem option was set
+   and al,MASK addmem             ; and skip allocation if not
+   jz start4
+
+   mov bx,addmem_pgs              ; allocate memory for additional buffer
+   jz start4                      ; skip if 0 pages were selected
+
    call NEAR PTR alloc_mem
    jnc start32
 
@@ -605,7 +631,21 @@ memory_action:
    call NEAR PTR print_address
    print 'h'
 
-   mov bx,OFFSET memory_string7
+   mov al,option                  ; print additional memory addreses
+   and al,MASK addmem             ; if addmem option was set
+   jnz memory_addmem_pgs_check
+
+   jmp memory_action_end
+
+memory_addmem_pgs_check:          ; and addmem_pgs was non zero
+   mov ax,addmem_pgs
+   test ax,ax
+   jnz memory_addmem_pgs_ok
+
+   jmp memory_action_end
+
+memory_addmem_pgs_ok:
+   mov bx,OFFSET memory_string7   ; print additional memory start addr
    print_string @data,bx
 
    xor di,di
@@ -613,14 +653,53 @@ memory_action:
    call NEAR PTR print_address
    print 'h'
 
-   mov bx,OFFSET memory_string8
+   mov bx,OFFSET memory_string8   ; print additional memory end addr
    print_string @data,bx
 
-   mov di,ADD_BUF_SIZE-1
-   mov es,additional_mem_buf
-   call NEAR PTR print_address
+   clc                            ; clear carry and reserve 4 bytes on stack
+   sbb sp,4                       ; for addition result
+
+   mov ax,addmem_pgs              ; multiply number of pages by 16
+   mov dx,16                      ; to get number of bytes in 32 bit number
+   mul dx
+   push dx                        ; save result on stack as addition parameter
+   push ax
+
+   mov ax,additional_mem_buf      ; convert segment to a 32 bit number
+   and ax,0F000h                  ; highest nibble as an upper word
+   shiftr ax,12
+   push ax                        ; save on stack as addition parameter
+
+   mov ax,additional_mem_buf      ; rest of addmem segment as a lower word
+   and ax,0FFFh                        
+   shiftl ax,4                    ; must shift left by 4 bits
+   push ax                        ; save on stack as addition parameter
+ 
+   call NEAR PTR add_32bit        ; add number of pages to segment
+   add sp,8                       ; remove addition params from stack
+                                  ; but leave result on stack
+
+   xor ax,ax                      ; push 1 on stack as 2nd subtraction parameter
+   push ax
+   mov ax,1
+   push ax
+
+   mov bx,sp                      ; copy result from stack as 1st subtraction
+   mov ax,word ptr ss:[bx + 6]    ; parameter
+   push ax
+   mov bx,sp
+   mov ax,word ptr ss:[bx + 6]
+   push ax
+
+   call NEAR PTR subtract_32bit   ; subtract 1 from addition result
+   add sp,8                       ; remove subtraction params from stack
+
+   call NEAR PTR print_number_hex ; print subtraction result
+   add sp,4                       ; remove result from stack
+
    print 'h'
 
+memory_action_end:
    pop es
    jmp reset_state
 
